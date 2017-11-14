@@ -1,0 +1,58 @@
+import cv2
+
+
+THRESHOLD_DISTANCE = 40
+
+def _create_sized_window(name: str, image) -> None:
+    """Creates a window of 1200 by 800 for the image"""
+    cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+    cv2.imshow(name, image)
+    cv2.resizeWindow(name, 1200, 800)
+
+def _get_clustered_keypoints(keypoints) -> list:
+    """Returns a list of images that contain potential markers. As long as there are more than threshold keypoints
+    within an area, then we want to add that area to our list of images"""
+
+    # Sort the keypoints by their x point values
+    keypoints.sort(key=lambda x: x.pt[0])
+
+    prev_point = (0,0)
+    good_matches = []
+
+    for point in keypoints:
+        # Check if x coordinates are within the threshold distance
+        if abs(point.pt[0] - prev_point[0]) <= THRESHOLD_DISTANCE:
+            # Check if y coordinates are within threshold distance
+            if abs(point.pt[1] - prev_point[1]) <= THRESHOLD_DISTANCE:
+
+                # If both criteria are met then add the point to our list
+                good_matches.append(point)
+
+        prev_point = point.pt
+
+    return good_matches
+
+
+
+# Get image and convert to HSV
+image_rgb = cv2.imread('test_area1.png')
+image_hsv =  cv2.cvtColor(image_rgb, cv2.COLOR_BGR2HSV)
+
+# Set our surf hessian threshold to 400
+surf = cv2.xfeatures2d_SURF.create(400)
+
+keypoints = surf.detect(image_hsv)
+
+image_with_keypoints = cv2.drawKeypoints(image_hsv, keypoints, None, (255,0,0), 4)
+
+# Remove stray keypoints
+reduced_keypoints = _get_clustered_keypoints(keypoints)
+
+reduced_keypoints_image = cv2.drawKeypoints(image_hsv, reduced_keypoints, None, (255,0,0), 4)
+
+_create_sized_window('image', image_with_keypoints)
+_create_sized_window('test', reduced_keypoints_image)
+
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
