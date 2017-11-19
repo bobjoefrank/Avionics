@@ -5,31 +5,62 @@
 #include "opencv2/xfeatures2d.hpp"
 #include "opencv2/highgui.hpp"
 
+#include "padded_roi.h"
 
 void readme();
 /* @function main */
 int main( int argc, char** argv )
 {
-    if( argc != 2 )
-    { readme(); return -1; }
-    cv::Mat img_1 = imread( argv[1], cv::IMREAD_GRAYSCALE );
 
-    if( !img_1.data )
-    { std::cout<< " --(!) Error reading image " << std::endl; return -1; }
-    //-- Step 1: Detect the keypoints using SURF Detector
+    //how big roi radius will be
+    float roi_width = 100;
+
+    //padding color
+    cv::Scalar padding_color = cvScalar(255,255,255);
+
+    if( argc != 2 ){
+        readme(); return -1;
+    }
+
+    cv::Mat img = imread (argv[1]);
+    cv::Mat img_grey = imread( argv[1], cv::IMREAD_GRAYSCALE );
+    cv::Mat img_hsv;
+    cvtColor(img, img_hsv, CV_BGR2HSV);
+
+    if( !img.data ){
+        std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
+    }
+
+    //detect the keypoints using SURF Detector
     int minHessian = 4000;
     cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
     std::vector<cv::KeyPoint> keypoints_1;
-    detector->detect( img_1, keypoints_1 );
+    detector->detect( img_grey, keypoints_1 );
 
-    //-- Draw keypoints
+    //draw keypoints
     cv::Mat img_keypoints_1;
-    cv::drawKeypoints( img_1, keypoints_1, img_keypoints_1, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT );
+    cv::drawKeypoints( img_grey, keypoints_1, img_keypoints_1, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT );
 
-    //-- Show detected (drawn) keypoints
-    imshow("Keypoints 1", img_keypoints_1 );
+    //show detected (drawn) keypoints
+    imshow("Keypoints", img_keypoints_1 );
 
-    //std::cout<< keypoints_1 << std::endl;
+    char window_name[80];
+    float x,y;
+    int counter = 0;
+    for(std::vector<cv::KeyPoint>::const_iterator i = keypoints_1.begin(); i != keypoints_1.end(); ++i){
+        counter++;
+        x = (i->pt.x)-(roi_width/2);
+        y = (i->pt.y)-(roi_width/2);
+        std::cout << "x: " << x << " y: " << y << std::endl;
+
+        //name for each window
+        sprintf(window_name, "ROIno.%d", counter);
+        //if the ROI region that we are cropping out goes out of bounds, adds a boder to it as padding
+        cv::Mat roi_image = getPaddedROI(img, x, y, roi_width, roi_width, padding_color);
+        imshow(window_name, roi_image);
+
+    }
+
 
     cv::waitKey(0);
     return 0;
