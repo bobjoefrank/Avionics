@@ -13,7 +13,7 @@ int main( int argc, char** argv )
 {
 
     //how big roi radius will be
-    float roi_width = 100;
+    float roi_width = 50;
 
     //padding color
     cv::Scalar padding_color = cvScalar(255,255,255);
@@ -32,7 +32,7 @@ int main( int argc, char** argv )
     }
 
     //detect the keypoints using SURF Detector
-    int minHessian = 4000;
+    int minHessian = 4500;
     cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
     std::vector<cv::KeyPoint> keypoints_1;
     detector->detect( img_grey, keypoints_1 );
