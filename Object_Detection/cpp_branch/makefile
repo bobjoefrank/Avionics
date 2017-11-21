@@ -1,12 +1,13 @@
 FLAGS = -pedantic -Wall -Wextra -Weffc++
 OBJS = roi_keypoint.o padded_roi.o
 DEPS = padded_roi.h
+EXE = roi_keypoint
 
 
 all: roi_keypoint
 
 clean:
-	rm -rf $(OBJS)
+	rm -rf $(OBJS) $(EXE)
 
 roi_keypoint: $(OBJS) $(pkg-config --libs opencv)
 	g++ $(FLAGS) $(OBJS) -o roi_keypoint $$(pkg-config --libs opencv)
