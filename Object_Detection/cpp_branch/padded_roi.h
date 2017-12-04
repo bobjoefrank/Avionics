@@ -1,5 +1,5 @@
-#ifndef _padded_roi
-#define _padded_roi
+#ifndef _padded_roi_h
+#define _padded_roi_h
 
 #include <iostream>
 #include <opencv2/opencv.hpp>

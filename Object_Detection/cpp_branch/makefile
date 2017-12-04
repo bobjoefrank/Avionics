@@ -1,6 +1,6 @@
 FLAGS = -pedantic -Wall -Wextra -Weffc++
-OBJS = roi_keypoint.o padded_roi.o
-DEPS = padded_roi.h
+OBJS = roi_keypoint.o padded_roi.o orientation.o
+DEPS = padded_roi.h orientation.h
 EXE = roi_keypoint
 
 
@@ -19,3 +19,6 @@ roi_keypoint.o: roi_keypoint.cpp $(DEPS)
 
 padded_roi.o: padded_roi.cpp padded_roi.h
 	g++ -c padded_roi.cpp -o padded_roi.o -ansi -Wall
+
+orientation.o: orientation.cpp orientation.h
+	g++ -c orientation.cpp -o orientation.o -ansi -Wall
