@@ -9,6 +9,6 @@ using namespace cv;
 
 void drawAxis(Mat&, Point, Point, Scalar, const float);
 
-double getOrientation(const vector<Point> &, Mat&, int, int);
+double getAngle(const vector<Point> &, Mat&, int, int);
 
 #endif
