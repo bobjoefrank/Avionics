@@ -1,5 +1,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
 
 using namespace std;
 using namespace cv;
@@ -15,7 +17,7 @@ void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2
     // Here we lengthen the arrow by a factor of scale
     q.x = (int) (p.x - scale * hypotenuse * cos(angle));
     q.y = (int) (p.y - scale * hypotenuse * sin(angle));
-    line(img, p, q, colour, 1, CV_AA);
+    //line(img, p, q, colour, 1, CV_AA);
     // create the arrow hooks
     /*
     p.x = (int) (q.x + 9 * cos(angle + CV_PI / 4));
@@ -26,7 +28,8 @@ void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2
     line(img, p, q, colour, 1, CV_AA);
     */
 }
-double getOrientation(const vector<Point> &pts, Mat &img, int scale1, int scale2)
+
+double getAngle(const vector<Point> &pts, Mat &img, int scale1, int scale2)
 {
     //Construct a buffer used by the pca analysis
     int sz = static_cast<int>(pts.size());
