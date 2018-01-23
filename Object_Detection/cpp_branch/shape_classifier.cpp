@@ -19,7 +19,6 @@ char const* classifyShape(std::vector<cv::Point> contours){
     //convexityDefects isContourConvex
     /*
     std::vector<cv::Point> approx;
-    std::vector<cv::Point> hull;
     cv::approxPolyDP(cv::Mat(contours), approx, cv::arcLength(cv::Mat(contours), true)*0.02, true);
     if(approx.size() == 1){
         return "circle";
@@ -46,15 +45,52 @@ char const* classifyShape(std::vector<cv::Point> contours){
         return "octagon";
     }
     */
-    
-    int defects_counter;
-    int min_defect_size = 5;
-    std::vector<cv::Vec4i> defects;
-    cv::convexHull(cv::Mat(contours), hull, false);
-    if(hull.size() > 3){
-        convexityDefects(contours, hull, defects);
-    }
 
+    std::vector<cv::Point> hull;
+    std::vector<int> hull_int;
+    std::vector<cv::Vec4i> defects;
+    cv::convexHull(contours, hull, false);
+    cv::convexHull(contours, hull_int, false);
+    if(hull_int.size() > 3){
+        convexityDefects(contours, hull_int, defects);
+    }
+    /*
+    if(hull_int.size() == 3){
+        return "triangle";
+    }
+    if(hull_int.size() == 4){
+        return "square rectangle or trapezoid";
+    }
+    if(hull_int.size() == 5){
+        return "pentagon";
+    }
+    if(hull_int.size() == 6){
+        return "hexagon";
+    }
+    if(hull_int.size() == 7){
+        return "heptagon";
+    }
+    if(hull_int.size() == 8){
+        return "octagon";
+    }
+    int size = hull_int.size();
+    std::cout << size << std::endl;
+    */
+    int convex_depth = 5;
+    int convex_counter = 0;
+    for(int j=0; j<defects.size(); ++j){
+        const cv::Vec4i& v = defects[j];
+        float depth = v[3] / 256;
+        if(depth > convex_depth){
+            convex_counter++;
+        }
+    }
+    if(convex_counter == 4){
+        return "cross";
+    }
+    if(convex_counter == 5){
+        return "star";
+    }
     return "can not determine";
 }
 
