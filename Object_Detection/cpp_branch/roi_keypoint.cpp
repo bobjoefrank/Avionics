@@ -72,7 +72,7 @@ int main( int argc, char** argv )
     cvtColor(img, img_hsv, CV_BGR2HSV);
 
     if( !img.data ){
-        std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
+        std::cout<< " Usage ./<executable_name> <img_directory> " << std::endl; return -1;
     }
 
     // detect the keypoints using SURF Detector
@@ -174,6 +174,9 @@ int main( int argc, char** argv )
         } else {
             counter++;
         }
+
+        //add some nice spacing kek
+        std::cout << "\n----------------------------\n" << std::endl;
 
         x = (i->pt.x)-(roi_width/2);
         y = (i->pt.y)-(roi_width/2);
@@ -325,7 +328,7 @@ int main( int argc, char** argv )
             imwrite("../pictures/saved_ocr.png", ocr_image_resized);
 
             //call python ocr model serving program
-            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_sample import *\n"
+            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
                                 "test()");
 
         }
@@ -399,7 +402,6 @@ int main( int argc, char** argv )
         //circle(roi_kmeans, c, 15, cv::Scalar::all(-1), 5, LINE_AA);
         //Point pt = c;
         //std::cout << pt.x << ", " << pt.y << std::endl;
-
     }
 
     //close python applications
@@ -413,4 +415,4 @@ int main( int argc, char** argv )
 
 /* @function readme */
 void readme()
-{ std::cout << " Usage: ./SURF_detector <img1>" << std::endl; }
+{ std::cout << " Usage: ./<executable_name> <img_directory>" << std::endl; }
