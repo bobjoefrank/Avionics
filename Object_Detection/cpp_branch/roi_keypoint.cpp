@@ -17,17 +17,20 @@ void readme();
 int main( int argc, char** argv )
 {
 
-    //number of ROI keypoints to compute with the greatest max_response
-    int roi_count = 40;
+    //ratio to resize image before putting it in surf detection and then resizing keypoints
+    float surf_resize_factor = 12;
 
-    // how big roi radius will be
-    float roi_width = 95;
+    //number of ROI keypoints to compute with the greatest max_response
+    int roi_count = 24;
+
+    // how big cropped roi image will be
+    float roi_width = 135;
 
     // padding color
     cv::Scalar padding_color = cvScalar(255,255,255);
 
     // kMeans parameters
-    int k = 4;
+    int k = 3;
     cv::Mat labels;
     int attempts = 30;
     cv::Mat centers;
@@ -36,10 +39,10 @@ int main( int argc, char** argv )
     int keypoint_group_distance = 50;
 
     // Hessian value
-    int minHessian = 6000;
+    int minHessian = 1200;
 
     // canny edge detection threshold 0-100
-    int canny_thresh = 5;
+    int canny_thresh = 0;
     // ratio for max threshold (suggested 3)
     int canny_ratio = 3;
     // kernel_sizes 3,5,7,9,11, makes a matrix of that size for canny edge detection
@@ -72,23 +75,29 @@ int main( int argc, char** argv )
     cvtColor(img, img_hsv, CV_BGR2HSV);
 
     if( !img.data ){
-        std::cout<< " Usage ./<executable_name> <img_directory> " << std::endl; return -1;
+        std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
     }
 
-    // detect the keypoints using SURF Detector
+
+    //resizes image, blurs image, finds keypoints, then returns keypoints with same aspect ration as original image
+    cv::Mat img_grey_resized;
+    cv::resize(img_grey, img_grey_resized, cv::Size(img_grey.cols/surf_resize_factor,img_grey.rows/surf_resize_factor));
+    cv::Mat img_grey_resized_blurred;
+    cv::GaussianBlur( img_grey_resized, img_grey_resized_blurred, Size(3,3), 0, 0);
     cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
     std::vector<cv::KeyPoint> keypoints;
-    detector->detect( img_grey, keypoints);
+    detector->detect( img_grey_resized_blurred, keypoints);
+    imshow("img_grey_resized_blurred", img_grey_resized_blurred);
+
+    for(int i=0; i<keypoints.size()-1; ++i){
+        keypoints[i].pt.x *= surf_resize_factor;
+        keypoints[i].pt.y *= surf_resize_factor;
+    }
 
     // if keypoints is less than certain number min:5 just discard the picture
 
-    // binarize kmeans photo and then run edge detection
-
-    //use cv chain approx simple and then create the shape from that
-
     //think about running kmeans then blurring and kmeans again to connect broken parts of shape
     //look at the cross picture for example
-
 
     // Takes keypoint with strongest response from each cluster within a certain distance
     // also gives back keypoint when no other keypoint in range
@@ -168,7 +177,7 @@ int main( int argc, char** argv )
         }
 
         //delete later
-        if(counter <= 35){
+        if(counter <= 2){
             counter++;
             continue;
         } else {
@@ -219,7 +228,7 @@ int main( int argc, char** argv )
         //
 
         /// Reduce noise with a kernel 3x3
-        //blur( roi_kmeans, roi_kmeans, Size(3,3) );
+        //blur( roi_image, roi_image, Size(9,9) );
 
         cv::Mat roi_canny_edges;
         cv::Canny(roi_kmeans, roi_canny_edges, canny_thresh, canny_thresh*canny_ratio, kernel_size);
@@ -237,7 +246,7 @@ int main( int argc, char** argv )
         for (size_t i = 0; i < canny_contours.size(); ++i)
         {
             std::vector<cv::Point> approx;
-            cv::approxPolyDP(cv::Mat(canny_contours[i]), canny_contours[i], cv::arcLength(cv::Mat(canny_contours[i]), true)*0.0025, true);
+            cv::approxPolyDP(cv::Mat(canny_contours[i]), canny_contours[i], cv::arcLength(cv::Mat(canny_contours[i]), true)*0.001, true);
 
         }
 
@@ -248,7 +257,7 @@ int main( int argc, char** argv )
             // Calculate the area of each contour
             double area = contourArea(canny_contours[i]);
             // Ignore contours that are too small or too large
-            if (area < 450 || 1e5 < area) continue;
+            if (area < 30 || 1e4 < area) continue;
 
             //collect contours that are within the area bounds
             ocr_contours.push_back(canny_contours[i]);
@@ -258,51 +267,55 @@ int main( int argc, char** argv )
         sprintf(window_name, "kMeans_no.%d", counter);
         imshow( window_name, roi_kmeans );
 
+        //get rid of images without any ocr_contours
+        if( !ocr_contours.size() ){
+            std::cout<< "No contours detected" << std::endl;
+            continue;
+        }
+
+        //get rid of images with contours that are too small
+        //checks if the largest contour is smaller than acceptable size
+        int max_index = 0;
+        int max_area = 0;
+        for (size_t i = 0; i < ocr_contours.size(); ++i)
+        {
+            double area = contourArea(ocr_contours[i]);
+            if(area > max_area){
+                max_index = i;
+                max_area = area;
+            }
+        }
+        if( max_area < 30 ){
+            continue;
+        }
 
         //
         // classify shapes
         //
 
+        std::cout << "number contours: " << ocr_contours.size() << std::endl;
+
+        //order contours from largest to smallest maybe?
+
+        //fill in max contour which will be the outermost outline of the letter
+        cv::Mat ocr_image = cv::Mat::zeros(roi_kmeans.size(), CV_8UC3);
+        cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
+
+        //fill in the other contours which may or may not be the holes of the letter with random colors
+        RNG rng(12345);
+        for (size_t i = 0; i < ocr_contours.size(); ++i){
+            if( i != max_index){
+                cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
+                cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
+            }
+        }
+
+        sprintf(window_name, "ocr_no.%d", counter);
+        imshow( window_name, ocr_image);
+
         // convert to OCR compatible image
-        if(counter == 37)
+        if(counter == 370000)
         {
-            std::cout << "number contours: " << ocr_contours.size() << std::endl;
-
-            //order contours from largest to smallest
-            //code here
-
-            //find max sized contour
-            int max_index = 0;
-            int max_area = 0;
-            for (size_t i = 0; i < ocr_contours.size(); ++i)
-            {
-                double area = contourArea(ocr_contours[i]);
-                if(area > max_area){
-                    max_index = i;
-                    max_area = area;
-                }
-            }
-
-            //fill in max contour which will be the outermost outline of the letter
-            cv::Mat ocr_image = cv::Mat::zeros(roi_kmeans.size(), CV_8UC3);
-            cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
-
-            cv::fillConvexPoly( ocr_image, ocr_contours[3], cv::Scalar(0, 0, 0));
-            cv::fillConvexPoly( ocr_image, ocr_contours[2], cv::Scalar(0, 0, 0));
-            cv::fillConvexPoly( ocr_image, ocr_contours[4], cv::Scalar(0, 0, 0));
-
-            /*
-            //fill in the other contours which may or may not be the holes of the letter with black space
-            RNG rng(12345);
-            for (size_t i = 0; i < ocr_contours.size(); ++i){
-                if( i != max_index){
-                    cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
-                    cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
-                }
-            }
-            */
-
-            imshow( "ocr_image", ocr_image);
 
             //crop out bounded box of letter
             cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
@@ -328,8 +341,24 @@ int main( int argc, char** argv )
             imwrite("../pictures/saved_ocr.png", ocr_image_resized);
 
             //call python ocr model serving program
-            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
-                                "test()");
+            // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
+            //                     "test()");
+
+
+            //
+            // find orientation of objects
+            //
+
+            std::vector<Point> max_orientation_contour = getMaxContour(roi_kmeans, orientation_min_area, orientation_max_area);
+            // Find the orientation of each object
+            double angle = getAngle(max_orientation_contour, roi_kmeans, line_size_1, line_size_2);
+            if( angle ){
+                std::cout << "radians: " << angle << std::endl;
+            } else {
+                std::cout << "No Object detected" << std::endl;
+            }
+            imshow( window_name, roi_kmeans );
+
 
         }
 
@@ -375,25 +404,6 @@ int main( int argc, char** argv )
         // }
 
 
-
-
-
-
-        //
-        // find orientation of objects
-        //
-
-        std::vector<Point> max_orientation_contour = getMaxContour(roi_kmeans, orientation_min_area, orientation_max_area);
-        // Find the orientation of each object
-        double angle = getAngle(max_orientation_contour, roi_kmeans, line_size_1, line_size_2);
-        if( angle ){
-            std::cout << "radians: " << angle << std::endl;
-        } else {
-            std::cout << "No Object detected" << std::endl;
-        }
-        imshow( window_name, roi_kmeans );
-
-
         // was trying to find centerpoints but points were falling out of bounds
         // center points would be the points used for finding whichthe kmeans group color is
 
@@ -415,4 +425,4 @@ int main( int argc, char** argv )
 
 /* @function readme */
 void readme()
-{ std::cout << " Usage: ./<executable_name> <img_directory>" << std::endl; }
+{ std::cout << " Usage: ./<executable_name> <img_name>" << std::endl; }

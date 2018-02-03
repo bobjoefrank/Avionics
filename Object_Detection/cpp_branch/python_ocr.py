@@ -13,6 +13,7 @@ import re
 import base64
 import pickle
 import json
+import shutil
 
 def load_model(bin_dir):
 
