@@ -5,7 +5,7 @@ EXE = roi_keypoint
 CFLAGS = -I/Library/Frameworks/Python.framework/Versions/3.5/include/python3.5m \
 			-I/Library/Frameworks/Python.framework/Versions/3.5/include/python3.5m \
 			-fno-strict-aliasing -Wsign-compare -fno-common -dynamic -DNDEBUG -g -fwrapv \
-			-O3 -Wall -Wstrict-prototypes -arch i386 -arch x86_64 -g
+			-O3 -Wall -Wstrict-prototypes -arch i386 -arch x86_64 -ggdb
 LDFLAGS = -L/Library/Frameworks/Python.framework/Versions/3.5/lib/python3.5/config-3.5m -lpython3.5m -ldl -framework CoreFoundation
 all: roi_keypoint
 

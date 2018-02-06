@@ -89,7 +89,7 @@ int main( int argc, char** argv )
     detector->detect( img_grey_resized_blurred, keypoints);
     imshow("img_grey_resized_blurred", img_grey_resized_blurred);
 
-    for(int i=0; i<keypoints.size()-1; ++i){
+    for(unsigned long i=0; i<keypoints.size()-1; ++i){
         keypoints[i].pt.x *= surf_resize_factor;
         keypoints[i].pt.y *= surf_resize_factor;
     }
@@ -138,9 +138,9 @@ int main( int argc, char** argv )
     }*/
 
     // find and delete duplicates
-    int j = 0;
+    unsigned long j = 0;
     while(j < grouped_keypoints.size()-1){
-        for(int i= j+1 ; i < grouped_keypoints.size();){
+        for(size_t i= j+1 ; i < grouped_keypoints.size();){
             if( grouped_keypoints[j].pt.x == grouped_keypoints[i].pt.x ){
                 grouped_keypoints.erase(grouped_keypoints.begin()+i);
             } else {
@@ -193,25 +193,25 @@ int main( int argc, char** argv )
 
         // if the ROI region that we are cropping out goes out of bounds, adds a border to it as padding
         cv::Mat roi_image = getPaddedROI(img, x, y, roi_width, roi_width, padding_color);
-        //sprintf(window_name, "roi_no.%d", counter);
-        //imshow( window_name, roi_image );
 
         //
         // run kMeans
         //
         cv::Mat centers;
-        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
-            for( int y = 0; y < roi_image.rows; y++ )
-                for( int x = 0; x < roi_image.cols; x++ )
-                    for( int z = 0; z < 3; z++)
-                        samples.at<float>(y + x*roi_image.rows, z) = roi_image.at<Vec3b>(y,x)[z];
+        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
+        for( int y = 0; y < roi_image.rows; y++ ) {
+            for( int x = 0; x < roi_image.cols; x++ ) {
+                for( int z = 0; z < 3; z++) {
+                    samples.at<float>(y + x*roi_image.rows, z) = roi_image.at<Vec3b>(y,x)[z];
+                }
+            }
+        }
 
-        kmeans(samples, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
+        kmeans(roi_image, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
 
         cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
-        for( int y = 0; y < roi_image.rows; y++ ){
-            for( int x = 0; x < roi_image.cols; x++ )
-            {
+        for( int y = 0; y < roi_image.rows; y++ ) {
+            for( int x = 0; x < roi_image.cols; x++ ) {
                 int cluster_idx = labels.at<int>(y + x*roi_image.rows,0);
                 roi_kmeans.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
                 roi_kmeans.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
@@ -264,10 +264,8 @@ int main( int argc, char** argv )
 
             cv::drawContours(roi_kmeans, canny_contours, static_cast<int>(i), Scalar(0, 0, 255), 1, 8, canny_hierarchy, 0);
         }
-        sprintf(window_name, "kMeans_no.%d", counter);
-        imshow( window_name, roi_kmeans );
 
-        //get rid of images without any ocr_contours
+        //get rid of images without any contours
         if( !ocr_contours.size() ){
             std::cout<< "No contours detected" << std::endl;
             continue;
@@ -295,132 +293,60 @@ int main( int argc, char** argv )
 
         std::cout << "number contours: " << ocr_contours.size() << std::endl;
 
-        //order contours from largest to smallest maybe?
+        cv::Mat ocr_image_resized = createOcrImage(ocr_contours, max_index, roi_kmeans);
 
-        //fill in max contour which will be the outermost outline of the letter
-        cv::Mat ocr_image = cv::Mat::zeros(roi_kmeans.size(), CV_8UC3);
-        cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
+        sprintf(window_name, "ocr_resized_no.%d", counter);
+        //imshow( window_name, ocr_image_resized);
 
-        //fill in the other contours which may or may not be the holes of the letter with random colors
-        RNG rng(12345);
-        for (size_t i = 0; i < ocr_contours.size(); ++i){
-            if( i != max_index){
-                cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
-                cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
-            }
-        }
+        imwrite("../pictures/saved_ocr.png", ocr_image_resized);
 
-        sprintf(window_name, "ocr_no.%d", counter);
-        imshow( window_name, ocr_image);
-
-        // convert to OCR compatible image
-        if(counter == 370000)
-        {
-
-            //crop out bounded box of letter
-            cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
-            cv::Mat ocr_cropped = ocr_image(bounding_box);
-            imshow( "ocr_cropped", ocr_cropped);
-
-            //create new image with some space between edge of picture
-            cv::Mat ocr_image_resized(ocr_cropped.size().height*1.3, ocr_cropped.size().width*1.3, CV_8UC3, cv::Scalar(0, 0, 0));
-
-            //find center of new created image
-            cv::Point ocr_center(ocr_image_resized.cols/2, ocr_image_resized.rows/2);
-
-            //compute the rectangle centered in the image, same size as box
-            cv::Rect center_box(ocr_center.x - bounding_box.width/2, ocr_center.y - bounding_box.height/2, bounding_box.width, bounding_box.height);
-
-            //copy the letter into the resized image
-            ocr_cropped.copyTo(ocr_image_resized(center_box));
-
-            //resize image to 28x28
-            cv::resize(ocr_image_resized, ocr_image_resized, cv::Size(28,28));
-            imshow( "ocr_image_resized", ocr_image_resized);
-
-            imwrite("../pictures/saved_ocr.png", ocr_image_resized);
-
-            //call python ocr model serving program
-            // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
-            //                     "test()");
+        //call python ocr model serving program
+        // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
+        //                     "test()");
 
 
-            //
-            // find orientation of objects
-            //
-
-            std::vector<Point> max_orientation_contour = getMaxContour(roi_kmeans, orientation_min_area, orientation_max_area);
-            // Find the orientation of each object
-            double angle = getAngle(max_orientation_contour, roi_kmeans, line_size_1, line_size_2);
-            if( angle ){
-                std::cout << "radians: " << angle << std::endl;
-            } else {
-                std::cout << "No Object detected" << std::endl;
-            }
-            imshow( window_name, roi_kmeans );
-
-
-        }
-
-        //cv::Mat roi_shapes;
-        //drawContours(roi_kmeans, canny_contours, -1, Scalar(255), CV_FILLED, 8);
-        //std::vector<Point> max_shape_contour = getMaxContour(roi_kmeans, shape_min, shape_max);
-        // for (size_t i = 0; i < canny_contours.size(); ++i)
-        // {
-        //     // Calculate the area of each contour
-        //     double area = contourArea(canny_contours[i]);
-        //     // Ignore contours that are too small or too large
-        //     if (area < 300 || 1e5 < area) continue;
         //
-        //     std::cout << "shape: " << classifyShape(canny_contours[i]) << std::endl;
-        //     /*
-        //     // drawing the convex contours for testing only
-        //     std::vector<cv::Point> hull;
-        //     std::vector<int> hull_int;
-        //     std::vector<cv::Vec4i> defects;
-        //     cv::convexHull(canny_contours[i], hull, false);
-        //     cv::convexHull(canny_contours[i], hull_int, false);
-        //     if(hull_int.size() > 3){
-        //         convexityDefects(canny_contours[i], hull_int, defects);
-        //     }
-        //     int convex_counter =0;
-        //     for(int j=0; j<defects.size(); ++j){
-        //         const cv::Vec4i& v = defects[j];
-        //         float depth = v[3] / 256;
-        //         if(depth > 5){
-        //             int startidx = v[0]; Point ptStart(canny_contours[i][startidx]);
-        //             int endidx = v[1]; Point ptEnd(canny_contours[i][endidx]);
-        //             int faridx = v[2]; Point ptFar(canny_contours[i][faridx]);
+        // find orientation of objects
         //
-        //             line(roi_kmeans, ptStart, ptEnd, Scalar(0, 255, 0), 1);
-        //             line(roi_kmeans, ptStart, ptFar, Scalar(0, 255, 0), 1);
-        //             line(roi_kmeans, ptEnd, ptFar, Scalar(0, 255, 0), 1);
-        //             //circle(roi_kmeans, ptFar, 4, Scalar(0, 255, 0), 2);
-        //             convex_counter++;
-        //         }
-        //     }
-        //     std::cout << convex_counter << std::endl;
-        //     */
-        // }
 
+        std::vector<Point> max_orientation_contour = getMaxContour(roi_kmeans, orientation_min_area, orientation_max_area);
+        // Find the orientation of each object
+        double angle = getAngle(max_orientation_contour, roi_kmeans, line_size_1, line_size_2);
+        if( angle ){
+            std::cout << "radians: " << angle << std::endl;
+        } else {
+            std::cout << "No Object detected" << std::endl;
+        }
+        //imshow( window_name, roi_kmeans );
 
         // was trying to find centerpoints but points were falling out of bounds
         // center points would be the points used for finding whichthe kmeans group color is
 
-        //cvtColor(roi_kmeans, roi_kmeans, CV_BGR2HSV);
-        //Point2f c = centers.at<Point2f>(0);
-        //circle(roi_kmeans, c, 15, cv::Scalar::all(-1), 5, LINE_AA);
-        //Point pt = c;
+        //
+        // find color of kmeans center points
+        //
+
+
+        std::cout << roi_image.size() << std::endl;
+        for (int i = 0; i < k; ++i){
+            std::cout << Point(centers.at<float>(i,0), centers.at<float>(i,1)) << std::endl;
+            circle(roi_kmeans, Point(centers.at<float>(i,0), centers.at<float>(i,1)), 3, cv::Scalar(255,255,255), 2, LINE_AA);
+        }
         //std::cout << pt.x << ", " << pt.y << std::endl;
+
+        sprintf(window_name, "kMeans_no.%d", counter);
+        imshow( window_name, roi_kmeans );
     }
 
     //close python applications
     Py_Finalize();
     PyMem_RawFree(program);
 
-    imshow("Keypoints", img_keypoints );
-    cv::waitKey(0);
-    return 0;
+    // wait for 'q' key to close
+    char key = cv::waitKey(0);
+    while ( key != 'q'){
+        key = cv::waitKey(0);
+    }
 }
 
 /* @function readme */

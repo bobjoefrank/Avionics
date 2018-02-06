@@ -8,90 +8,42 @@
 
 #include "shape_classifier.h"
 
-char const* classifyShape(std::vector<cv::Point> contours){
-    /*
-    std::vector<cv::Point> approx;
-    cv::approxPolyDP(cv::Mat(canny_contours[i]), approx, cv::arcLength(cv::Mat(canny_contours[i]), true)*0.02, true);
-    if(approx.size() == 4){
-        std::cout << "its a square" << std::endl;
-    }
-    */
-    //convexityDefects isContourConvex
-    /*
-    std::vector<cv::Point> approx;
-    cv::approxPolyDP(cv::Mat(contours), approx, cv::arcLength(cv::Mat(contours), true)*0.02, true);
-    if(approx.size() == 1){
-        return "circle";
-    }
-    if(approx.size() == 2){
-        return "semi_circle or quarter_circle";
-    }
-    if(approx.size() == 3){
-        return "triangle";
-    }
-    if(approx.size() == 4){
-        return "square rectangle or trapezoid";
-    }
-    if(approx.size() == 5){
-        return "pentagon";
-    }
-    if(approx.size() == 6){
-        return "hexagon";
-    }
-    if(approx.size() == 7){
-        return "heptagon";
-    }
-    if(approx.size() == 8){
-        return "octagon";
-    }
-    */
+cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img){
+    //order contours from largest to smallest maybe?
 
-    std::vector<cv::Point> hull;
-    std::vector<int> hull_int;
-    std::vector<cv::Vec4i> defects;
-    cv::convexHull(contours, hull, false);
-    cv::convexHull(contours, hull_int, false);
-    if(hull_int.size() > 3){
-        convexityDefects(contours, hull_int, defects);
-    }
-    /*
-    if(hull_int.size() == 3){
-        return "triangle";
-    }
-    if(hull_int.size() == 4){
-        return "square rectangle or trapezoid";
-    }
-    if(hull_int.size() == 5){
-        return "pentagon";
-    }
-    if(hull_int.size() == 6){
-        return "hexagon";
-    }
-    if(hull_int.size() == 7){
-        return "heptagon";
-    }
-    if(hull_int.size() == 8){
-        return "octagon";
-    }
-    int size = hull_int.size();
-    std::cout << size << std::endl;
-    */
-    int convex_depth = 5;
-    int convex_counter = 0;
-    for(int j=0; j<defects.size(); ++j){
-        const cv::Vec4i& v = defects[j];
-        float depth = v[3] / 256;
-        if(depth > convex_depth){
-            convex_counter++;
+    //fill in max contour which will be the outermost outline of the letter
+    cv::Mat ocr_image = cv::Mat::zeros(img.size(), CV_8UC3);
+    cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
+
+    //fill in the other contours which may or may not be the holes of the letter with random colors
+    cv::RNG rng(12345);
+    for (size_t  i = 0; i < ocr_contours.size(); ++i){
+        if( i != max_index){
+            cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
+            cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
         }
     }
-    if(convex_counter == 4){
-        return "cross";
-    }
-    if(convex_counter == 5){
-        return "star";
-    }
-    return "can not determine";
+
+    //crop out bounded box of letter
+    cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
+    cv::Mat ocr_cropped = ocr_image(bounding_box);
+
+    //create new image with some space between edge of picture
+    cv::Mat ocr_image_resized(ocr_cropped.size().height*1.3, ocr_cropped.size().width*1.3, CV_8UC3, cv::Scalar(0, 0, 0));
+
+    //find center of new created image
+    cv::Point ocr_center(ocr_image_resized.cols/2, ocr_image_resized.rows/2);
+
+    //compute the rectangle centered in the image, same size as box
+    cv::Rect center_box(ocr_center.x - bounding_box.width/2, ocr_center.y - bounding_box.height/2, bounding_box.width, bounding_box.height);
+
+    //copy the letter into the resized image
+    ocr_cropped.copyTo(ocr_image_resized(center_box));
+
+    //resize image to 28x28
+    cv::resize(ocr_image_resized, ocr_image_resized, cv::Size(28,28));
+
+    return ocr_image_resized;
 }
 
 std::vector<cv::Point> getMaxContour(cv::Mat& img, int orientation_min_area, int orientation_max_area)

@@ -9,7 +9,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
-char const* classifyShape(std::vector<cv::Point>);
+cv::Mat createOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat);
 
 std::vector<cv::Point> getMaxContour(cv::Mat&, int, int);
 
