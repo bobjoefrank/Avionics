@@ -10,7 +10,7 @@
 
 #include "padded_roi.h"
 #include "orientation.h"
-#include "shape_classifier.h"
+#include "classifier.h"
 
 void readme();
 /* @function main */
@@ -197,6 +197,7 @@ int main( int argc, char** argv )
         //
         // run kMeans
         //
+
         cv::Mat centers;
         cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
         for( int y = 0; y < roi_image.rows; y++ ) {
@@ -207,7 +208,7 @@ int main( int argc, char** argv )
             }
         }
 
-        kmeans(roi_image, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
+        kmeans(samples, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
 
         cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
         for( int y = 0; y < roi_image.rows; y++ ) {
@@ -221,7 +222,7 @@ int main( int argc, char** argv )
 
         // kMeans window name creator
         sprintf(window_name, "kMeans_no.%d", counter);
-        imshow( window_name, roi_kmeans );
+        imshow( window_name, roi_kmeans);
 
         //
         // canny edge detection and findcontours
@@ -325,14 +326,11 @@ int main( int argc, char** argv )
         //
         // find color of kmeans center points
         //
-
-
-        std::cout << roi_image.size() << std::endl;
         for (int i = 0; i < k; ++i){
-            std::cout << Point(centers.at<float>(i,0), centers.at<float>(i,1)) << std::endl;
-            circle(roi_kmeans, Point(centers.at<float>(i,0), centers.at<float>(i,1)), 3, cv::Scalar(255,255,255), 2, LINE_AA);
+            std::cout << " R: " << (int)centers.at<float>(i,2) << " G: " << (int)centers.at<float>(i,1) << " B: " << (int)centers.at<float>(i,0) << std::endl;
+            std::string color = findColor(centers, i);
+            std::cout << color << std::endl;
         }
-        //std::cout << pt.x << ", " << pt.y << std::endl;
 
         sprintf(window_name, "kMeans_no.%d", counter);
         imshow( window_name, roi_kmeans );

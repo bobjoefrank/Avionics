@@ -6,7 +6,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
-#include "shape_classifier.h"
+#include "classifier.h"
 
 cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img){
     //order contours from largest to smallest maybe?
@@ -18,7 +18,7 @@ cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int ma
     //fill in the other contours which may or may not be the holes of the letter with random colors
     cv::RNG rng(12345);
     for (size_t  i = 0; i < ocr_contours.size(); ++i){
-        if( i != max_index){
+        if( (int)i != max_index){
             cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
             cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
         }
@@ -46,18 +46,90 @@ cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int ma
     return ocr_image_resized;
 }
 
-std::vector<cv::Point> getMaxContour(cv::Mat& img, int orientation_min_area, int orientation_max_area)
+std::string findColor(cv::Mat centers, int index){
+    double B = centers.at<float>(index,0);
+    double G = centers.at<float>(index,1);
+    double R = centers.at<float>(index,2);
+
+    double Cmax, Cmin;
+    Cmax = (B > G)? B : G;
+    Cmax = (R > Cmax)? R : Cmax;
+    Cmin = (B > G)? G : B;
+    Cmin = (R > Cmin)? Cmin : R;
+
+    double delta = Cmax - Cmin;
+
+    double H;
+    if(Cmax <= R){
+        H = 60 * (fmod(((G-B)/delta),6));
+    } else if(Cmax <= G){
+        H = 60 * (((B-R)/delta)+2);
+    } else if(Cmax <= B){
+        H = 60 * (((R-G)/delta)+4);
+    } else {
+        H = 0;
+    }
+
+    double S;
+    if(Cmax >= 0.001){
+        S = delta/Cmax;
+    } else {
+        S = 0;
+    }
+
+    double V;
+    V = Cmax/255;
+
+    //readable HSV values
+    std::cout << " H: " << H <<" S: " << S << " V: " << V << std::endl;
+
+    //opencv conversion
+    H *= 0.5;
+    S *= 255;
+    V *= 255;
+
+    if(V<75){
+        return "black";
+    }
+    if(S<25){
+        return "white";
+    }
+    if(H>168){
+        return "red";
+    }
+    if(H>128){
+        return "purple";
+    }
+    if(H>86){
+        return "blue";
+    }
+    if(H>52){
+        return "green";
+    }
+    if(H>29){
+        return "yellow";
+    }
+    if(H>11){
+        return "orange";
+    }
+    if(H>=0){
+        return "red";
+    }
+    return "yo";
+}
+
+std::vector<cv::Point> getMaxContour(cv::Mat& img, int oRentation_min_area, int oRentation_max_area)
 {
     cv::Mat img_grey;
     cvtColor(img, img_grey, cv::COLOR_BGR2GRAY);
 
-    cv::Mat img_binary;
-    cv::threshold(img_grey, img_binary, 50, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+    cv::Mat img_Bnary;
+    cv::threshold(img_grey, img_Bnary, 50, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
 
     // Find all the contours in the thresholded image
     std::vector<cv::Vec4i> hierarchy;
     std::vector<std::vector<cv::Point> > contours;
-    findContours(img_binary, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+    findContours(img_Bnary, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
     //find max sized object within specified area limits
     int max_index = 0;
@@ -67,7 +139,7 @@ std::vector<cv::Point> getMaxContour(cv::Mat& img, int orientation_min_area, int
         // Calculate the area of each contour
         double area = contourArea(contours[i]);
         // Ignore contours that are too small or too large
-        if (area < orientation_min_area || orientation_max_area < area) continue;
+        if (area < oRentation_min_area || oRentation_max_area < area) continue;
 
         if(area > max_area){
             max_index = i;
