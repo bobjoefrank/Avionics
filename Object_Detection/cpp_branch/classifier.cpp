@@ -60,11 +60,11 @@ std::string findColor(cv::Mat centers, int index){
     double delta = Cmax - Cmin;
 
     double H;
-    if(Cmax <= R){
+    if(Cmax == R){
         H = 60 * (fmod(((G-B)/delta),6));
-    } else if(Cmax <= G){
+    } else if(Cmax == G){
         H = 60 * (((B-R)/delta)+2);
-    } else if(Cmax <= B){
+    } else if(Cmax == B){
         H = 60 * (((R-G)/delta)+4);
     } else {
         H = 0;
@@ -88,11 +88,18 @@ std::string findColor(cv::Mat centers, int index){
     S *= 255;
     V *= 255;
 
-    if(V<75){
+
+    // add colors grey and brown
+
+    if(V<92){
         return "black";
     }
-    if(S<25){
-        return "white";
+    if(S<70){
+        if(V<230){
+            return "grey";
+        } else {
+            return "white";
+        }
     }
     if(H>168){
         return "red";
@@ -103,14 +110,22 @@ std::string findColor(cv::Mat centers, int index){
     if(H>86){
         return "blue";
     }
-    if(H>52){
+    if(H>40){
         return "green";
     }
-    if(H>29){
-        return "yellow";
+    if(H>27){
+        if(V <= 91 && V >= 31){
+            return "brown";
+        } else {
+            return "yellow";
+        }
     }
     if(H>11){
-        return "orange";
+        if(V <= 91 && V >= 31){
+            return "brown";
+        } else {
+            return "orange";
+        }
     }
     if(H>=0){
         return "red";
