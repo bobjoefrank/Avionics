@@ -78,6 +78,7 @@ int main( int argc, char** argv )
         std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
     }
 
+    //cv::resize(img_grey, img_grey, cv::Size(3000,2000));
 
     //resizes image, blurs image, finds keypoints, then returns keypoints with same aspect ration as original image
     cv::Mat img_grey_resized;
@@ -198,8 +199,15 @@ int main( int argc, char** argv )
         // run kMeans
         //
 
+        //testing delete later
+        // imshow( "break testing", roi_image);
+        // circle(img_keypoints, cv::Point(x,y), 16, cv::Scalar(0,0,255), 5, CV_AA, 0);
+        // imshow("Keypoints", img_keypoints );
+        // cv::waitKey(0);
+
+
         cv::Mat centers;
-        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
+        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
                 for( int z = 0; z < 3; z++) {
@@ -213,7 +221,7 @@ int main( int argc, char** argv )
         cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
-                int cluster_idx = labels.at<int>(y + x*roi_image.rows,0);
+                int cluster_idx = labels.at<int>(y + x*roi_image.rows, 0);
                 roi_kmeans.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
                 roi_kmeans.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
                 roi_kmeans.at<Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);

@@ -1,8 +1,8 @@
-FLAGS = -pedantic -Wall -Wextra -Weffc++
+FLAGS = -pedantic -Wall -Wextra -Weffc++ -g -std=c++14
 OBJS = OGdetect.o padded_roi.o orientation.o classifier.o
 DEPS = padded_roi.h orientation.h classifier.h
 EXE = OGdetect
-CFLAGS = `python3-config --cflags`
+CFLAGS = $(FLAGS) `python3-config --cflags`
 LDFLAGS = `python3-config --ldflags`
 
 all: OGdetect
