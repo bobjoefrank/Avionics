@@ -289,7 +289,7 @@ int main( int argc, char** argv )
         }
 
         //
-        // classify shapes
+        // classify letters
         //
 
         std::cout << "number contours: " << ocr_contours.size() << std::endl;
@@ -318,14 +318,11 @@ int main( int argc, char** argv )
         } else {
             std::cout << "No Object detected" << std::endl;
         }
-        //imshow( window_name, roi_kmeans );
-
-        // was trying to find centerpoints but points were falling out of bounds
-        // center points would be the points used for finding whichthe kmeans group color is
 
         //
         // find color of kmeans center points
         //
+
         for (int i = 0; i < k; ++i){
             std::cout << " R: " << (int)centers.at<float>(i,2) << " G: " << (int)centers.at<float>(i,1) << " B: " << (int)centers.at<float>(i,0) << std::endl;
             std::string color = findColor(centers, i);
