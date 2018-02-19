@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <iostream>
+#include <cmath>
 #include <Python.h>
 #include <string>
 
@@ -8,9 +9,9 @@
 #include "opencv2/xfeatures2d.hpp"
 #include "opencv2/highgui.hpp"
 
-#include "padded_roi.h"
 #include "orientation.h"
 #include "classifier.h"
+#include "objectdetection_functions.h"
 
 void readme();
 /* @function main */
@@ -18,7 +19,7 @@ int main( int argc, char** argv )
 {
 
     //ratio to resize image before putting it in surf detection and then resizing keypoints
-    float surf_resize_factor = 12;
+    float surf_resize_factor = 6;
 
     //number of ROI keypoints to compute with the greatest max_response
     int roi_count = 24;
@@ -70,7 +71,6 @@ int main( int argc, char** argv )
     }
 
     cv::Mat img = imread (argv[1]);
-    cv::Mat img_grey = imread( argv[1], cv::IMREAD_GRAYSCALE );
     cv::Mat img_hsv;
     cvtColor(img, img_hsv, CV_BGR2HSV);
 
@@ -79,16 +79,17 @@ int main( int argc, char** argv )
     }
 
 
-    //resizes image, blurs image, finds keypoints, then returns keypoints with same aspect ration as original image
-    cv::Mat img_grey_resized;
-    cv::resize(img_grey, img_grey_resized, cv::Size(img_grey.cols/surf_resize_factor,img_grey.rows/surf_resize_factor));
-    cv::Mat img_grey_resized_blurred;
-    cv::GaussianBlur( img_grey_resized, img_grey_resized_blurred, Size(3,3), 0, 0);
-    cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
-    std::vector<cv::KeyPoint> keypoints;
-    detector->detect( img_grey_resized_blurred, keypoints);
-    imshow("img_grey_resized_blurred", img_grey_resized_blurred);
+    //resizes image, finds keypoints, then returns keypoints with same aspect ratio as original image
+    cv::Mat hsv_channels[3];
+    cv::split(img_hsv, hsv_channels);
+    cv::Mat used_channel = hsv_channels[2];
 
+    cv::resize(used_channel, used_channel, cv::Size(img_hsv.cols/surf_resize_factor,img_hsv.rows/surf_resize_factor));
+
+    std::vector<cv::KeyPoint> keypoints = get_SURF_detected_keypoints(used_channel, minHessian);
+    imshow("hsv_channel", used_channel);
+
+    //Convert keypoints back to original dimensions
     for(unsigned long i=0; i<keypoints.size()-1; ++i){
         keypoints[i].pt.x *= surf_resize_factor;
         keypoints[i].pt.y *= surf_resize_factor;
@@ -102,53 +103,11 @@ int main( int argc, char** argv )
     // Takes keypoint with strongest response from each cluster within a certain distance
     // also gives back keypoint when no other keypoint in range
     std::vector<cv::KeyPoint> grouped_keypoints;
-    grouped_keypoints = keypoints;
-    int index_a = 0;
-    for(std::vector<cv::KeyPoint>::const_iterator point_a = grouped_keypoints.begin(); point_a != grouped_keypoints.end(); point_a++){
-        int index_b = 0;
-        for(std::vector<cv::KeyPoint>::const_iterator point_b = grouped_keypoints.begin(); point_b != grouped_keypoints.end(); point_b++){
-            if (abs(point_a->pt.x - point_b->pt.x) <= keypoint_group_distance && abs(point_a->pt.y - point_b->pt.y) <= keypoint_group_distance){
-                if (point_b->response > point_a->response){
-                    grouped_keypoints[index_a] = grouped_keypoints[index_b];
-                }
-            }
-            index_b += 1;
-        }
-        index_a += 1;
-    }
+    grouped_keypoints = group_keypoints(keypoints, keypoint_group_distance);
 
-    // alternate cluster keypoint without stranded keypoints
-    /*std::vector<cv::KeyPoint> grouped_keypoints;
-    int index_a = 0;
-    int max_index = 0;
-    for(std::vector<cv::KeyPoint>::const_iterator point_a = keypoints.begin(); point_a != keypoints.end(); point_a++){
-        int index_b = 0;
-        float max_response = 0;
-        for(std::vector<cv::KeyPoint>::const_iterator point_b = keypoints.begin(); point_b != keypoints.end(); point_b++){
-            if (abs(point_a->pt.x - point_b->pt.x) <= keypoint_group_distance && abs(point_a->pt.y - point_b->pt.y) <= keypoint_group_distance){
-                if (point_b->response > max_response){
-                    max_response = point_b->response;
-                    max_index = index_b;
-                }
-            }
-            index_b += 1;
-        }
-        grouped_keypoints.push_back(keypoints[max_index]);
-        index_a += 1;
-    }*/
 
     // find and delete duplicates
-    unsigned long j = 0;
-    while(j < grouped_keypoints.size()-1){
-        for(size_t i= j+1 ; i < grouped_keypoints.size();){
-            if( grouped_keypoints[j].pt.x == grouped_keypoints[i].pt.x ){
-                grouped_keypoints.erase(grouped_keypoints.begin()+i);
-            } else {
-                ++i;
-            }
-        }
-        ++j;
-    }
+    grouped_keypoints = delete_duplicates(grouped_keypoints);
 
     // draw keypoints
     cv::Mat img_keypoints;
