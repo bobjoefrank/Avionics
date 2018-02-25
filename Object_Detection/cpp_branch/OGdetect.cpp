@@ -25,16 +25,10 @@ int main( int argc, char** argv )
     int roi_count = 24;
 
     // how big cropped roi image will be
-    float roi_width = 135;
+    float roi_width = 200;
 
     // padding color
     cv::Scalar padding_color = cvScalar(255,255,255);
-
-    // kMeans parameters
-    int k = 3;
-    cv::Mat labels;
-    int attempts = 30;
-    cv::Mat centers;
 
     // keypoint grouping distance
     int keypoint_group_distance = 50;
@@ -65,14 +59,12 @@ int main( int argc, char** argv )
 
 
     // read image
-    if( argc != 2 ){
-        readme();
-        return -1;
-    }
+//    if( argc != 2 ){
+//        readme();
+//        return -1;
+//    }
 
-    cv::Mat img = imread (argv[1]);
-    cv::Mat img_hsv;
-    cvtColor(img, img_hsv, CV_BGR2HSV);
+    cv::Mat img = imread ("C:\\Users\\Matthew\\Desktop\\Work\\UCI\\UAVForge\\Avionics\\Object_Detection\\pictures\\35mm.jpg");
 
     if( !img.data ){
         std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
@@ -80,14 +72,21 @@ int main( int argc, char** argv )
 
 
     //resizes image, finds keypoints, then returns keypoints with same aspect ratio as original image
+    cv::Mat reduced_img;
+    cv::resize(img, reduced_img, cv::Size(img.cols/surf_resize_factor,img.rows/surf_resize_factor));
+
+    cv::Mat img_hsv;
+    cvtColor(reduced_img, img_hsv, CV_BGR2HSV);
     cv::Mat hsv_channels[3];
     cv::split(img_hsv, hsv_channels);
     cv::Mat used_channel = hsv_channels[2];
 
-    cv::resize(used_channel, used_channel, cv::Size(img_hsv.cols/surf_resize_factor,img_hsv.rows/surf_resize_factor));
+
 
     std::vector<cv::KeyPoint> keypoints = get_SURF_detected_keypoints(used_channel, minHessian);
     imshow("hsv_channel", used_channel);
+
+    cout << keypoints.size() << endl;
 
     //Convert keypoints back to original dimensions
     for(unsigned long i=0; i<keypoints.size()-1; ++i){
@@ -111,19 +110,48 @@ int main( int argc, char** argv )
 
     // draw keypoints
     cv::Mat img_keypoints;
-    cv::drawKeypoints( img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
+    cv::drawKeypoints(img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
 
     // show detected (drawn) keypoints
     imshow("Keypoints", img_keypoints );
 
-    //initialize python integration
-    wchar_t *program = Py_DecodeLocale(argv[0], NULL);
-    if (program == NULL) {
-        fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
-        exit(1);
+    cout << grouped_keypoints.size() << endl;
+
+    // Shape Extraction
+
+    int shape_counter = 0;
+    for(std::vector<cv::KeyPoint>::const_iterator i = grouped_keypoints.begin(); i != grouped_keypoints.end(); i++) {
+        shape_counter++;
+        if (shape_counter >= roi_count) {
+            break;
+        }
+
+        float x = (i->pt.x)-(roi_width/2);
+        float y = (i->pt.y)-(roi_width/2);
+        std::cout << "Keypoint:" <<" x: " << i->pt.x << " y: " << i->pt.y << std::endl;
+
+        // if the ROI region that we are cropping out goes out of bounds, adds a border to it as padding
+        cv::Mat roi_image = getPaddedROI(img, x, y, roi_width, roi_width, padding_color);
+
+        //Apply kmeans to posterize image
+        cv::Mat kmeans_image, centers;
+        getKmeansImage(roi_image, kmeans_image, centers, 3);
+
+        //Get the shape (without letter) as a black and white image (binary)
+        Mat bw_image = getShapeAsBinary(kmeans_image, roi_width);
+
+//        imshow(to_string(counter), bw_image);
     }
-    Py_SetProgramName(program);  /* optional but recommended */
-    Py_Initialize();
+
+
+//    //initialize python integration
+//    wchar_t *program = Py_DecodeLocale(argv[0], NULL);
+//    if (program == NULL) {
+//        fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
+//        exit(1);
+//    }
+//    Py_SetProgramName(program);  /* optional but recommended */
+//    Py_Initialize();
 
     char window_name[80];
     float x,y;
@@ -156,28 +184,8 @@ int main( int argc, char** argv )
         //
         // run kMeans
         //
-
-        cv::Mat centers;
-        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
-        for( int y = 0; y < roi_image.rows; y++ ) {
-            for( int x = 0; x < roi_image.cols; x++ ) {
-                for( int z = 0; z < 3; z++) {
-                    samples.at<float>(y + x*roi_image.rows, z) = roi_image.at<Vec3b>(y,x)[z];
-                }
-            }
-        }
-
-        kmeans(samples, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
-
-        cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
-        for( int y = 0; y < roi_image.rows; y++ ) {
-            for( int x = 0; x < roi_image.cols; x++ ) {
-                int cluster_idx = labels.at<int>(y + x*roi_image.rows,0);
-                roi_kmeans.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
-                roi_kmeans.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
-                roi_kmeans.at<Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);
-            }
-        }
+        cv::Mat roi_kmeans, centers;
+        getKmeansImage(roi_image, roi_kmeans, centers, 3);
 
         // kMeans window name creator
         sprintf(window_name, "kMeans_no.%d", counter);
@@ -282,7 +290,7 @@ int main( int argc, char** argv )
         // find color of kmeans center points
         //
 
-        for (int i = 0; i < k; ++i){
+        for (int i = 0; i < 3; ++i){
             std::cout << " R: " << (int)centers.at<float>(i,2) << " G: " << (int)centers.at<float>(i,1) << " B: " << (int)centers.at<float>(i,0) << std::endl;
             std::string color = findColor(centers, i);
             std::cout << color << std::endl;
@@ -292,9 +300,9 @@ int main( int argc, char** argv )
         imshow( window_name, roi_kmeans );
     }
 
-    //close python applications
-    Py_Finalize();
-    PyMem_RawFree(program);
+//    close python applications
+//    Py_Finalize();
+//    PyMem_RawFree(program);
 
     // wait for 'q' key to close
     char key = cv::waitKey(0);

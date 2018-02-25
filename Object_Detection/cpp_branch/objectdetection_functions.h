@@ -15,5 +15,7 @@ std::vector<cv::KeyPoint> get_SURF_detected_keypoints(const Mat img, int minHess
 std::vector<cv::KeyPoint> group_keypoints(std::vector<cv::KeyPoint> keypoints, int keypoint_group_distance);
 std::vector<cv::KeyPoint> delete_duplicates(std::vector<cv::KeyPoint> keypoints);
 Mat getPaddedROI(const Mat &input, int top_left_x, int top_left_y, int width, int height, Scalar paddingColor);
+void getKmeansImage(Mat &src, Mat &dst, Mat &centers, int k);
+Mat getShapeAsBinary(const Mat kmeans_img, int roi_width);
 
 #endif
