@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
+#include <cmath>
 #include <Python.h>
 #include <string>
 
@@ -9,10 +10,9 @@
 #include "opencv2/xfeatures2d.hpp"
 #include "opencv2/highgui.hpp"
 
-#include "padded_roi.h"
 #include "orientation.h"
 #include "classifier.h"
-#include "keras_model.h"
+#include "padded_roi.h"
 
 void readme();
 /* @function main */
@@ -63,8 +63,6 @@ int main( int argc, char** argv )
     //shape_min = 0;
     //shape_max = 1e5;
 
-
-
     // read image
     if( argc < 2 ){
         readme();
@@ -77,12 +75,10 @@ int main( int argc, char** argv )
     cvtColor(img, img_hsv, CV_BGR2HSV);
 
     if( !img.data ){
-        std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
-    }
+         std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
+     }
 
-    //cv::resize(img_grey, img_grey, cv::Size(3000,2000));
-
-    //resizes image, blurs image, finds keypoints, then returns keypoints with same aspect ration as original image
+    //resizes image, finds keypoints, then returns keypoints with same aspect ratio as original image
     cv::Mat img_grey_resized;
     cv::resize(img_grey, img_grey_resized, cv::Size(img_grey.cols/surf_resize_factor,img_grey.rows/surf_resize_factor));
     cv::Mat img_grey_resized_blurred;
@@ -92,6 +88,7 @@ int main( int argc, char** argv )
     detector->detect( img_grey_resized_blurred, keypoints);
     imshow("img_grey_resized_blurred", img_grey_resized_blurred);
 
+    //Convert keypoints back to original dimensions
     for(unsigned long i=0; i<keypoints.size()-1; ++i){
         keypoints[i].pt.x *= surf_resize_factor;
         keypoints[i].pt.y *= surf_resize_factor;
@@ -155,7 +152,7 @@ int main( int argc, char** argv )
 
     // draw keypoints
     cv::Mat img_keypoints;
-    cv::drawKeypoints( img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
+    cv::drawKeypoints(img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
 
     // show detected (drawn) keypoints
     imshow("Keypoints", img_keypoints );
@@ -201,14 +198,8 @@ int main( int argc, char** argv )
         // run kMeans
         //
 
-        //testing delete later
-        // imshow( "break testing", roi_image);
-        // circle(img_keypoints, cv::Point(x,y), 16, cv::Scalar(0,0,255), 5, CV_AA, 0);
-        // imshow("Keypoints", img_keypoints );
-        // cv::waitKey(0);
-
         cv::Mat centers;
-        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
+        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
                 for( int z = 0; z < 3; z++) {
@@ -222,7 +213,7 @@ int main( int argc, char** argv )
         cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
-                int cluster_idx = labels.at<int>(y + x*roi_image.rows, 0);
+                int cluster_idx = labels.at<int>(y + x*roi_image.rows,0);
                 roi_kmeans.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
                 roi_kmeans.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
                 roi_kmeans.at<Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);
@@ -322,19 +313,19 @@ int main( int argc, char** argv )
             imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
 
             // call python ocr model serving program
-            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
-                                "test()");
+            // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
+            //                     "test()");
 
             // format image for input into python server
-            // std::vector<unsigned char> storage_buffer;
-            // FILE* fp = fopen(argv[2], "w");
-            // imencode( ".jpg", ocr_image_resized, storage_buffer);
-            // // write(fdnum, &storage_buffer[0], sizeof(uchar));
-            // std::string img_size_str = std::to_string(storage_buffer.size());
-            // std::cout << img_size_str << std::endl;
-            // fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
-            // fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
-            
+            std::vector<unsigned char> storage_buffer;
+            FILE* fp = fopen(argv[2], "w");
+            imencode( ".jpg", ocr_image_resized, storage_buffer);
+            // write(fdnum, &storage_buffer[0], sizeof(uchar));
+            std::string img_size_str = std::to_string(storage_buffer.size());
+            std::cout << img_size_str << std::endl;
+            fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
+            fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
+
         }
 
         //
@@ -354,7 +345,7 @@ int main( int argc, char** argv )
         // find color of kmeans center points
         //
 
-        for (int i = 0; i < k; ++i){
+        for (int i = 0; i < 3; ++i){
             std::cout << " R: " << (int)centers.at<float>(i,2) << " G: " << (int)centers.at<float>(i,1) << " B: " << (int)centers.at<float>(i,0) << std::endl;
             std::string color = findColor(centers, i);
             std::cout << color << std::endl;
@@ -365,8 +356,8 @@ int main( int argc, char** argv )
     }
 
     //close python applications
-    Py_Finalize();
-    PyMem_RawFree(program);
+   Py_Finalize();
+   PyMem_RawFree(program);
 
     // wait for 'q' key to close
     char key = cv::waitKey(0);

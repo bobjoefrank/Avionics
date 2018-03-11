@@ -53,8 +53,8 @@ def printshit(fifo, model,mapping):
                         # print('img!')
                         # print(image)
                         # print()
-                        with open(str(len(images)) + '.jpg', 'wb') as f2:
-                            f2.write(image)
+                        # with open(str(len(images)) + '.jpg', 'wb') as f2:
+                        #     f2.write(image)
                         wait_new_file = True
                         img_buff = img_buff[bytes_remaining:]   # carry over to next iteration
     os.close(fd)
@@ -84,8 +84,8 @@ def main(inp_image):
     try:
         outs, err = proc.communicate()
         # print(outs.decode())
-        with open('test.jpg', 'w+') as f:
-            pass
+        # with open('test.jpg', 'w+') as f:
+        #     pass
             # f.write(outs)
     except Exception as e:
         print(e)
