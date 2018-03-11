@@ -18,8 +18,6 @@ import io
 
 import tensorflow as tf
 
-graph = tf.get_default_graph()
-
 def load_model(bin_dir):
 
     # load YAML and create model
@@ -32,21 +30,17 @@ def load_model(bin_dir):
     model.load_weights('%s/model.h5' % bin_dir)
     return model
 
-def test(image,model,mapping):
+def test():
 
-    # #model and weights location
-    # bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
-    #
-    # # load model
-    # model = load_model(bin_dir)
-    # mapping = pickle.load(open('%s/mapping.p' % bin_dir, 'rb'))
-    # print(mapping)
-    # # read parsed image back in 8-bit, black and white mode (L)
-    # x = imread('../pictures/saved_ocr.jpg', mode='L')
-    #
-    # # Visualize new array
-    # imsave('../pictures/saved_ocr.png', x)
-    x = imread(io.BytesIO(image), mode='L')
+    #model and weights location
+    bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
+
+    # load model
+    model = load_model(bin_dir)
+    mapping = pickle.load(open('%s/mapping.p' % bin_dir, 'rb'))
+
+    # read parsed image back in 8-bit, black and white mode (L)
+    x = imread('../pictures/saved_ocr.jpg', mode='L')
 
     x = imresize(x,(28,28))
     # reshape image data for use in neural network
@@ -59,22 +53,14 @@ def test(image,model,mapping):
     x /= 255
 
     # Predict from model
-    with graph.as_default():
-        out = model.predict(x)
+    out = model.predict(x)
 
     # Generate response
     response = {'prediction': chr(mapping[(int(np.argmax(out, axis=1)[0]))]),
                 'confidence': str(max(out[0]) * 100)[:6]}
+                
     #print result
     print(json.dumps(response))
-    sys.stdout.flush()
 
-if __name__ == '__main__':    #model and weights location
-    bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
-
-    #load model
-    model = load_model(bin_dir)
-    mapping = pickle.load(open('%s/mapping.p' % bin_dir, 'rb'))
-    with open("1.jpg", 'rb') as f:
-        b = bytearray(f.read())
-    test(b, model, mapping)
+if __name__ == '__main__':
+    test()

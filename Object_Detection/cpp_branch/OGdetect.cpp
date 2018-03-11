@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <stdio.h>
 #include <iostream>
 #include <Python.h>
@@ -11,6 +12,7 @@
 #include "padded_roi.h"
 #include "orientation.h"
 #include "classifier.h"
+#include "keras_model.h"
 
 void readme();
 /* @function main */
@@ -64,7 +66,7 @@ int main( int argc, char** argv )
 
 
     // read image
-    if( argc != 2 ){
+    if( argc < 2 ){
         readme();
         return -1;
     }
@@ -205,7 +207,6 @@ int main( int argc, char** argv )
         // imshow("Keypoints", img_keypoints );
         // cv::waitKey(0);
 
-
         cv::Mat centers;
         cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
         for( int y = 0; y < roi_image.rows; y++ ) {
@@ -256,7 +257,6 @@ int main( int argc, char** argv )
         {
             std::vector<cv::Point> approx;
             cv::approxPolyDP(cv::Mat(canny_contours[i]), canny_contours[i], cv::arcLength(cv::Mat(canny_contours[i]), true)*0.001, true);
-
         }
 
         // draw canny_contours for visualization purposes only
@@ -304,15 +304,38 @@ int main( int argc, char** argv )
 
         cv::Mat ocr_image_resized = createOcrImage(ocr_contours, max_index, roi_kmeans);
 
-        sprintf(window_name, "ocr_resized_no.%d", counter);
-        //imshow( window_name, ocr_image_resized);
+        if(counter == 5 || counter == 23){
+            sprintf(window_name, "ocr_resized_no.%d", counter);
+            imshow( window_name, ocr_image_resized);
 
-        imwrite("../pictures/saved_ocr.png", ocr_image_resized);
+            // format input to ocr model and pass in
+            std::vector<std::vector<float> > ocr_image_vector;
+            for(int x = 0; x<ocr_image_resized.rows; x++){
+                std::vector<float> temp_row;
+                for(int y = 0; y<ocr_image_resized.cols; y++){
+                    temp_row.push_back(((float)ocr_image_resized.at<Vec3b>(x,y).val[0])/255);
+                }
+                ocr_image_vector.push_back(temp_row);
+            }
 
-        //call python ocr model serving program
-        // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom python_ocr import *\n"
-        //                     "test()");
+            //save image
+            imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
 
+            // call python ocr model serving program
+            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
+                                "test()");
+
+            // format image for input into python server
+            // std::vector<unsigned char> storage_buffer;
+            // FILE* fp = fopen(argv[2], "w");
+            // imencode( ".jpg", ocr_image_resized, storage_buffer);
+            // // write(fdnum, &storage_buffer[0], sizeof(uchar));
+            // std::string img_size_str = std::to_string(storage_buffer.size());
+            // std::cout << img_size_str << std::endl;
+            // fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
+            // fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
+            
+        }
 
         //
         // find orientation of objects
