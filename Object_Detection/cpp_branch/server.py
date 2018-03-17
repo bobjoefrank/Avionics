@@ -8,7 +8,7 @@ import binascii
 import time
 
 from python_ocr import *
-import python_cnn as cnn
+# import python_cnn as cnn
 
 manager = Value('i', 0)
 
@@ -61,7 +61,7 @@ def printshit(fifo, model,mapping):
     os.close(fd)
     for image in images:
         test(image,model,mapping)
-        cnn.run_model(image)
+        # cnn.run_model(image)
         # ps = threading.Thread(target=test, args=(image,model,mapping))
         # ps.start()
 

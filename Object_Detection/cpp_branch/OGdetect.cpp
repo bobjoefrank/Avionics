@@ -14,6 +14,14 @@
 #include "classifier.h"
 #include "padded_roi.h"
 
+
+// flood fill cornell
+
+// after creating ocr image, look up hierarchy of contours
+// also make each inner contour a lower intensity value of
+// the previous one by some intensity
+
+
 void readme();
 /* @function main */
 int main( int argc, char** argv )
@@ -34,7 +42,7 @@ int main( int argc, char** argv )
     // kMeans parameters
     int k = 3;
     cv::Mat labels;
-    int attempts = 30;
+    int attempts = 20;
     cv::Mat centers;
 
     // keypoint grouping distance
@@ -86,9 +94,11 @@ int main( int argc, char** argv )
     cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
     std::vector<cv::KeyPoint> keypoints;
     detector->detect( img_grey_resized_blurred, keypoints);
-    imshow("img_grey_resized_blurred", img_grey_resized_blurred);
 
-    //Convert keypoints back to original dimensions
+    // save keypoints for grey_blurred image
+    std::vector<cv::KeyPoint>resized_keypoints = keypoints;
+
+    // convert keypoints back to original dimensions
     for(unsigned long i=0; i<keypoints.size()-1; ++i){
         keypoints[i].pt.x *= surf_resize_factor;
         keypoints[i].pt.y *= surf_resize_factor;
@@ -153,9 +163,11 @@ int main( int argc, char** argv )
     // draw keypoints
     cv::Mat img_keypoints;
     cv::drawKeypoints(img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
+    cv::drawKeypoints(img_grey_resized_blurred, resized_keypoints, img_grey_resized_blurred, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
 
     // show detected (drawn) keypoints
     imshow("Keypoints", img_keypoints );
+    imshow("img_grey_resized_blurred", img_grey_resized_blurred);
 
     //initialize python integration
     wchar_t *program = Py_DecodeLocale(argv[0], NULL);
@@ -177,12 +189,13 @@ int main( int argc, char** argv )
         }
 
         //delete later
-        if(counter <= 2){
-            counter++;
-            continue;
-        } else {
-            counter++;
-        }
+        // if(counter <= 2){
+        //     counter++;
+        //     continue;
+        // } else {
+        //     counter++;
+        // }
+        counter++;
 
         //add some nice spacing kek
         std::cout << "\n----------------------------\n" << std::endl;
@@ -199,7 +212,7 @@ int main( int argc, char** argv )
         //
 
         cv::Mat centers;
-        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32FC2);
+        cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
                 for( int z = 0; z < 3; z++) {
@@ -313,18 +326,18 @@ int main( int argc, char** argv )
             imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
 
             // call python ocr model serving program
-            // PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
-            //                     "test()");
+            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
+                                "test()");
 
-            // format image for input into python server
-            std::vector<unsigned char> storage_buffer;
-            FILE* fp = fopen(argv[2], "w");
-            imencode( ".jpg", ocr_image_resized, storage_buffer);
-            // write(fdnum, &storage_buffer[0], sizeof(uchar));
-            std::string img_size_str = std::to_string(storage_buffer.size());
-            std::cout << img_size_str << std::endl;
-            fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
-            fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
+        //     // format image for input into python server
+        //     // std::vector<unsigned char> storage_buffer;
+        //     // FILE* fp = fopen(argv[2], "w");
+        //     // imencode( ".jpg", ocr_image_resized, storage_buffer);
+        //     // // write(fdnum, &storage_buffer[0], sizeof(uchar));
+        //     // std::string img_size_str = std::to_string(storage_buffer.size());
+        //     // std::cout << img_size_str << std::endl;
+        //     // fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
+        //     // fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
 
         }
 
