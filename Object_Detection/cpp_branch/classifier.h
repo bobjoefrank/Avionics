@@ -9,7 +9,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
-cv::Mat createOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat);
+cv::Mat createOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat, std::vector<cv::Vec4i> hierarchy);
 
 std::string findColor(cv::Mat, int);
 

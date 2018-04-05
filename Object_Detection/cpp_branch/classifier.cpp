@@ -8,7 +8,7 @@
 
 #include "classifier.h"
 
-cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img){
+cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy){
     //order contours from largest to smallest maybe?
 
     //fill in max contour which will be the outermost outline of the letter
@@ -19,8 +19,10 @@ cv::Mat createOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int ma
     cv::RNG rng(12345);
     for (size_t  i = 0; i < ocr_contours.size(); ++i){
         if( (int)i != max_index){
-            cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0, 255), rng.uniform(0, 255));
-            cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
+            cv::Scalar color = cv::Scalar(0,0,0);
+            if(hierarchy[i][3] == -1){
+                cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
+            }
         }
     }
 

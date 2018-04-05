@@ -41,14 +41,12 @@ int main( int argc, char** argv )
 
     // kMeans parameters
     int k = 3;
-    cv::Mat labels;
-    int attempts = 20;
-    cv::Mat centers;
+    int attempts = 15;
 
     // keypoint grouping distance
     int keypoint_group_distance = 50;
 
-    // Hessian value
+    // SURF hessian value
     int minHessian = 1200;
 
     // canny edge detection threshold 0-100
@@ -67,9 +65,9 @@ int main( int argc, char** argv )
     int line_size_1 = 14;
     int line_size_2 = 9;
 
-    // shape classifier min and max area for contours
-    //shape_min = 0;
-    //shape_max = 1e5;
+    // letter classifier min and max area for contours
+    int letter_min_area = 30;
+    int letter_max_area = 1e4;
 
     // read image
     if( argc < 2 ){
@@ -79,8 +77,6 @@ int main( int argc, char** argv )
 
     cv::Mat img = imread (argv[1]);
     cv::Mat img_grey = imread( argv[1], cv::IMREAD_GRAYSCALE );
-    cv::Mat img_hsv;
-    cvtColor(img, img_hsv, CV_BGR2HSV);
 
     if( !img.data ){
          std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
@@ -105,9 +101,6 @@ int main( int argc, char** argv )
     }
 
     // if keypoints is less than certain number min:5 just discard the picture
-
-    //think about running kmeans then blurring and kmeans again to connect broken parts of shape
-    //look at the cross picture for example
 
     // Takes keypoint with strongest response from each cluster within a certain distance
     // also gives back keypoint when no other keypoint in range
@@ -211,6 +204,7 @@ int main( int argc, char** argv )
         // run kMeans
         //
 
+        cv::Mat labels;
         cv::Mat centers;
         cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
         for( int y = 0; y < roi_image.rows; y++ ) {
@@ -251,52 +245,42 @@ int main( int argc, char** argv )
         sprintf(window_name, "Canny_Edge_no.%d", counter);
         //imshow(window_name, roi_canny_edges);
 
-        // find contours
-        std::vector<std::vector<cv::Point> > canny_contours;
-        std::vector<Vec4i> canny_hierarchy;
-        cv::findContours(roi_canny_edges, canny_contours, canny_hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE, Point(0,0));
+        std::vector<std::vector<cv::Point> > canny_contours_ccomp;
+        std::vector<Vec4i> canny_hierarchy_ccomp;
+        cv::findContours(roi_canny_edges, canny_contours_ccomp, canny_hierarchy_ccomp, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE, Point(0,0));
 
         //approximates polygonal curves with polygon of less vertices to smooth (lessen) distance between vertices
-        for (size_t i = 0; i < canny_contours.size(); ++i)
+        for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
         {
             std::vector<cv::Point> approx;
-            cv::approxPolyDP(cv::Mat(canny_contours[i]), canny_contours[i], cv::arcLength(cv::Mat(canny_contours[i]), true)*0.001, true);
-        }
-
-        // draw canny_contours for visualization purposes only
-        std::vector<std::vector<cv::Point> > ocr_contours;
-        for (size_t i = 0; i < canny_contours.size(); ++i)
-        {
-            // Calculate the area of each contour
-            double area = contourArea(canny_contours[i]);
-            // Ignore contours that are too small or too large
-            if (area < 30 || 1e4 < area) continue;
-
-            //collect contours that are within the area bounds
-            ocr_contours.push_back(canny_contours[i]);
-
-            cv::drawContours(roi_kmeans, canny_contours, static_cast<int>(i), Scalar(0, 0, 255), 1, 8, canny_hierarchy, 0);
+            cv::approxPolyDP(cv::Mat(canny_contours_ccomp[i]), canny_contours_ccomp[i], cv::arcLength(cv::Mat(canny_contours_ccomp[i]), true)*0.001, true);
         }
 
         //get rid of images without any contours
-        if( !ocr_contours.size() ){
+        if( !canny_contours_ccomp.size() ){
             std::cout<< "No contours detected" << std::endl;
             continue;
         }
 
-        //get rid of images with contours that are too small
         //checks if the largest contour is smaller than acceptable size
         int max_index = 0;
         int max_area = 0;
-        for (size_t i = 0; i < ocr_contours.size(); ++i)
+        for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
         {
-            double area = contourArea(ocr_contours[i]);
+            // calculate the area of each contour
+            double area = contourArea(canny_contours_ccomp[i]);
             if(area > max_area){
                 max_index = i;
                 max_area = area;
             }
+            //ignore contours too small
+            if (area < letter_min_area || letter_max_area < area) continue;
+
+            //draw for visuals only if contours big enough
+            cv::drawContours(roi_kmeans, canny_contours_ccomp, static_cast<int>(i), Scalar(0, 0, 255), 1, 8, canny_hierarchy_ccomp, 0);
         }
-        if( max_area < 30 ){
+        if( max_area < letter_min_area ){
+            std::cout<< "Contours too small" << std::endl;
             continue;
         }
 
@@ -304,9 +288,9 @@ int main( int argc, char** argv )
         // classify letters
         //
 
-        std::cout << "number contours: " << ocr_contours.size() << std::endl;
+        std::cout << "number contours: " << canny_contours_ccomp.size() << std::endl;
 
-        cv::Mat ocr_image_resized = createOcrImage(ocr_contours, max_index, roi_kmeans);
+        cv::Mat ocr_image_resized = createOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp);
 
         if(counter == 5 || counter == 23){
             sprintf(window_name, "ocr_resized_no.%d", counter);
@@ -320,6 +304,10 @@ int main( int argc, char** argv )
                     temp_row.push_back(((float)ocr_image_resized.at<Vec3b>(x,y).val[0])/255);
                 }
                 ocr_image_vector.push_back(temp_row);
+            }
+
+            for(int i=0; i < canny_hierarchy_ccomp.size(); i++){
+                std::cout << canny_hierarchy_ccomp[i] << std::endl;
             }
 
             //save image

@@ -69,8 +69,8 @@ def load_labels(label_file):
 
 if __name__ == "__main__":
   file_name = ""
-  model_file = "outputs_mobilenet/output_graph.pb"
-  label_file = "outputs_mobilenet/output_labels.txt"
+  model_file = "../outputs_mobilenet/output_graph.pb"
+  label_file = "../outputs_mobilenet/output_labels.txt"
   input_height = 224
   input_width = 224
   input_mean = 128

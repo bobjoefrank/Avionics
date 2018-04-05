@@ -33,7 +33,7 @@ def load_model(bin_dir):
 def test():
 
     #model and weights location
-    bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
+    bin_dir = '/Users/phillip/Desktop/projects/Avionics/Object_Detection/models'
 
     # load model
     model = load_model(bin_dir)

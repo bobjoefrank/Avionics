@@ -69,7 +69,7 @@ def printshit(fifo, model,mapping):
 def main(inp_image):
 
     #model and weights location
-    bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
+    bin_dir = '../models'
 
     #load model
     model = load_model(bin_dir)
