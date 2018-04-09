@@ -9,7 +9,11 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
-cv::Mat createOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat, std::vector<cv::Vec4i> hierarchy);
+cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat, std::vector<cv::Vec4i> hierarchy);
+
+cv::Mat ResizeOcrImage(cv::Mat, int);
+
+cv::Mat RotateOcrImage45(cv::Mat);
 
 std::string findColor(cv::Mat, int);
 

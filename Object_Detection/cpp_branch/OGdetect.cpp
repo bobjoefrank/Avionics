@@ -12,14 +12,21 @@
 
 #include "orientation.h"
 #include "classifier.h"
-#include "padded_roi.h"
+#include "filtering.h"
 
 
 // flood fill cornell
 
-// after creating ocr image, look up hierarchy of contours
-// also make each inner contour a lower intensity value of
-// the previous one by some intensity
+// think about if keypoints is less than certain number min:5 just discard the 
+
+// take top number responses above a certain value or a set number from the top
+// whichever comes first
+
+// 474
+// 320 x 480 y
+// 954 x zoom 487 y zoom
+
+// recalculate height and speed of airplane and time between each photo
 
 
 void readme();
@@ -31,7 +38,7 @@ int main( int argc, char** argv )
     float surf_resize_factor = 12;
 
     //number of ROI keypoints to compute with the greatest max_response
-    int roi_count = 24;
+    int roi_count = 6;
 
     // how big cropped roi image will be
     float roi_width = 135;
@@ -58,7 +65,7 @@ int main( int argc, char** argv )
 
     // size limits for object when finding orientation
     int orientation_min_area = 0;
-    int orientation_max_area = 1e5;
+    int orientation_max_area = 1e7;
     // scales for visualization purposes only, adjust to lengthen lines
     // scale1 = green line, used as reference for radians
     // scale2 = blue line
@@ -75,18 +82,21 @@ int main( int argc, char** argv )
         return -1;
     }
 
-    cv::Mat img = imread (argv[1]);
-    cv::Mat img_grey = imread( argv[1], cv::IMREAD_GRAYSCALE );
+    cv::Mat img = cv::imread (argv[1]);
+    cv::Mat img_grey = cv::imread( argv[1], cv::IMREAD_GRAYSCALE );
 
     if( !img.data ){
          std::cout<< " Usage ./<executable_name> <img_name> " << std::endl; return -1;
      }
 
+
+
+
     //resizes image, finds keypoints, then returns keypoints with same aspect ratio as original image
     cv::Mat img_grey_resized;
     cv::resize(img_grey, img_grey_resized, cv::Size(img_grey.cols/surf_resize_factor,img_grey.rows/surf_resize_factor));
     cv::Mat img_grey_resized_blurred;
-    cv::GaussianBlur( img_grey_resized, img_grey_resized_blurred, Size(3,3), 0, 0);
+    cv::GaussianBlur( img_grey_resized, img_grey_resized_blurred, cv::Size(3,3), 0, 0);
     cv::Ptr<cv::xfeatures2d::SURF> detector = cv::xfeatures2d::SURF::create( minHessian );
     std::vector<cv::KeyPoint> keypoints;
     detector->detect( img_grey_resized_blurred, keypoints);
@@ -100,58 +110,14 @@ int main( int argc, char** argv )
         keypoints[i].pt.y *= surf_resize_factor;
     }
 
-    // if keypoints is less than certain number min:5 just discard the picture
-
     // Takes keypoint with strongest response from each cluster within a certain distance
-    // also gives back keypoint when no other keypoint in range
-    std::vector<cv::KeyPoint> grouped_keypoints;
-    grouped_keypoints = keypoints;
-    int index_a = 0;
-    for(std::vector<cv::KeyPoint>::const_iterator point_a = grouped_keypoints.begin(); point_a != grouped_keypoints.end(); point_a++){
-        int index_b = 0;
-        for(std::vector<cv::KeyPoint>::const_iterator point_b = grouped_keypoints.begin(); point_b != grouped_keypoints.end(); point_b++){
-            if (abs(point_a->pt.x - point_b->pt.x) <= keypoint_group_distance && abs(point_a->pt.y - point_b->pt.y) <= keypoint_group_distance){
-                if (point_b->response > point_a->response){
-                    grouped_keypoints[index_a] = grouped_keypoints[index_b];
-                }
-            }
-            index_b += 1;
-        }
-        index_a += 1;
-    }
-
-    // alternate cluster keypoint without stranded keypoints
-    /*std::vector<cv::KeyPoint> grouped_keypoints;
-    int index_a = 0;
-    int max_index = 0;
-    for(std::vector<cv::KeyPoint>::const_iterator point_a = keypoints.begin(); point_a != keypoints.end(); point_a++){
-        int index_b = 0;
-        float max_response = 0;
-        for(std::vector<cv::KeyPoint>::const_iterator point_b = keypoints.begin(); point_b != keypoints.end(); point_b++){
-            if (abs(point_a->pt.x - point_b->pt.x) <= keypoint_group_distance && abs(point_a->pt.y - point_b->pt.y) <= keypoint_group_distance){
-                if (point_b->response > max_response){
-                    max_response = point_b->response;
-                    max_index = index_b;
-                }
-            }
-            index_b += 1;
-        }
-        grouped_keypoints.push_back(keypoints[max_index]);
-        index_a += 1;
-    }*/
+    // also gives back keypoint when no other keypoints in range
+    std::vector<cv::KeyPoint> grouped_keypoints = GroupKeypoints(keypoints, keypoint_group_distance);
 
     // find and delete duplicates
-    unsigned long j = 0;
-    while(j < grouped_keypoints.size()-1){
-        for(size_t i= j+1 ; i < grouped_keypoints.size();){
-            if( grouped_keypoints[j].pt.x == grouped_keypoints[i].pt.x ){
-                grouped_keypoints.erase(grouped_keypoints.begin()+i);
-            } else {
-                ++i;
-            }
-        }
-        ++j;
-    }
+    grouped_keypoints = DeleteDupes(grouped_keypoints);
+
+    std::cout<< "Number of keypoints: " << grouped_keypoints.size() << std::endl;
 
     // draw keypoints
     cv::Mat img_keypoints;
@@ -180,14 +146,6 @@ int main( int argc, char** argv )
         if(counter >= roi_count){
             break;
         }
-
-        //delete later
-        // if(counter <= 2){
-        //     counter++;
-        //     continue;
-        // } else {
-        //     counter++;
-        // }
         counter++;
 
         //add some nice spacing kek
@@ -204,26 +162,27 @@ int main( int argc, char** argv )
         // run kMeans
         //
 
+        // put in new file called filtering and find out how to return two types, centers and mat image
         cv::Mat labels;
         cv::Mat centers;
         cv::Mat samples(roi_image.rows * roi_image.cols, 3, CV_32F);
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
                 for( int z = 0; z < 3; z++) {
-                    samples.at<float>(y + x*roi_image.rows, z) = roi_image.at<Vec3b>(y,x)[z];
+                    samples.at<float>(y + x*roi_image.rows, z) = roi_image.at<cv::Vec3b>(y,x)[z];
                 }
             }
         }
 
-        kmeans(samples, k, labels, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, KMEANS_PP_CENTERS, centers );
+        kmeans(samples, k, labels, cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10000, 0.0001), attempts, cv::KMEANS_PP_CENTERS, centers );
 
         cv::Mat roi_kmeans( roi_image.size(), roi_image.type() );
         for( int y = 0; y < roi_image.rows; y++ ) {
             for( int x = 0; x < roi_image.cols; x++ ) {
                 int cluster_idx = labels.at<int>(y + x*roi_image.rows,0);
-                roi_kmeans.at<Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
-                roi_kmeans.at<Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
-                roi_kmeans.at<Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);
+                roi_kmeans.at<cv::Vec3b>(y,x)[0] = centers.at<float>(cluster_idx, 0);
+                roi_kmeans.at<cv::Vec3b>(y,x)[1] = centers.at<float>(cluster_idx, 1);
+                roi_kmeans.at<cv::Vec3b>(y,x)[2] = centers.at<float>(cluster_idx, 2);
             }
         }
 
@@ -246,8 +205,8 @@ int main( int argc, char** argv )
         //imshow(window_name, roi_canny_edges);
 
         std::vector<std::vector<cv::Point> > canny_contours_ccomp;
-        std::vector<Vec4i> canny_hierarchy_ccomp;
-        cv::findContours(roi_canny_edges, canny_contours_ccomp, canny_hierarchy_ccomp, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE, Point(0,0));
+        std::vector<cv::Vec4i> canny_hierarchy_ccomp;
+        cv::findContours(roi_canny_edges, canny_contours_ccomp, canny_hierarchy_ccomp, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE, cv::Point(0,0));
 
         //approximates polygonal curves with polygon of less vertices to smooth (lessen) distance between vertices
         for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
@@ -274,10 +233,10 @@ int main( int argc, char** argv )
                 max_area = area;
             }
             //ignore contours too small
-            if (area < letter_min_area || letter_max_area < area) continue;
+            if (area < letter_min_area || area > letter_max_area) continue;
 
             //draw for visuals only if contours big enough
-            cv::drawContours(roi_kmeans, canny_contours_ccomp, static_cast<int>(i), Scalar(0, 0, 255), 1, 8, canny_hierarchy_ccomp, 0);
+            cv::drawContours(roi_kmeans, canny_contours_ccomp, static_cast<int>(i), cvScalar(0, 0, 255), 1, 8, canny_hierarchy_ccomp, 0);
         }
         if( max_area < letter_min_area ){
             std::cout<< "Contours too small" << std::endl;
@@ -290,32 +249,43 @@ int main( int argc, char** argv )
 
         std::cout << "number contours: " << canny_contours_ccomp.size() << std::endl;
 
-        cv::Mat ocr_image_resized = createOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp);
-
         if(counter == 5 || counter == 23){
-            sprintf(window_name, "ocr_resized_no.%d", counter);
-            imshow( window_name, ocr_image_resized);
+            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp);
+            cv::Mat ocr_resized = ResizeOcrImage(ocr_cropped, 0);
 
-            // format input to ocr model and pass in
-            std::vector<std::vector<float> > ocr_image_vector;
-            for(int x = 0; x<ocr_image_resized.rows; x++){
-                std::vector<float> temp_row;
-                for(int y = 0; y<ocr_image_resized.cols; y++){
-                    temp_row.push_back(((float)ocr_image_resized.at<Vec3b>(x,y).val[0])/255);
-                }
-                ocr_image_vector.push_back(temp_row);
+            cv::Mat ocr_rotated_45 = RotateOcrImage45(ocr_cropped);
+            cv::Mat ocr_resized_45 = ResizeOcrImage(ocr_rotated_45, 1);
+            int degrees1 = 0;
+            int degrees2 = 45;
+            for(int i = 0; i < 4; ++i){
+                cv::rotate(ocr_resized, ocr_resized, 0);
+                sprintf(window_name, "ocr_resized_no.%d_%d", counter, degrees1);
+                imshow( window_name, ocr_resized);
+
+                cv::rotate(ocr_resized_45, ocr_resized_45, 0);
+                sprintf(window_name, "ocr_resized_no.%d_%d", counter, degrees2);
+                imshow( window_name, ocr_resized_45);
+
+                degrees1 += 90;
+                degrees2 += 90;
             }
 
-            for(int i=0; i < canny_hierarchy_ccomp.size(); i++){
-                std::cout << canny_hierarchy_ccomp[i] << std::endl;
-            }
+            // // format input to ocr model and pass in
+            // std::vector<std::vector<float> > ocr_image_vector;
+            // for(int x = 0; x<ocr_image_resized.rows; x++){
+            //     std::vector<float> temp_row;
+            //     for(int y = 0; y<ocr_image_resized.cols; y++){
+            //         temp_row.push_back(((float)ocr_image_resized.at<Vec3b>(x,y).val[0])/255);
+            //     }
+            //     ocr_image_vector.push_back(temp_row);
+            // }
 
             //save image
-            imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
+            //imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
 
             // call python ocr model serving program
-            PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
-                                "test()");
+            //PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
+            //                    "test()");
 
         //     // format image for input into python server
         //     // std::vector<unsigned char> storage_buffer;
@@ -333,7 +303,7 @@ int main( int argc, char** argv )
         // find orientation of objects
         //
 
-        std::vector<Point> max_orientation_contour = getMaxContour(roi_kmeans, orientation_min_area, orientation_max_area);
+        std::vector<cv::Point> max_orientation_contour = getMaxContour(roi_image, orientation_min_area, orientation_max_area);
         // Find the orientation of each object
         double angle = getAngle(max_orientation_contour, roi_kmeans, line_size_1, line_size_2);
         if( angle ){

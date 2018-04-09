@@ -4,11 +4,8 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-using namespace std;
-using namespace cv;
+void drawAxis(cv::Mat&, cv::Point, cv::Point, cv::Scalar, const float);
 
-void drawAxis(Mat&, Point, Point, Scalar, const float);
-
-double getAngle(const vector<Point> &, Mat&, int, int);
+double getAngle(const std::vector<cv::Point> &, cv::Mat&, int, int);
 
 #endif
