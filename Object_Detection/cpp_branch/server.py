@@ -60,7 +60,8 @@ def printshit(fifo, model,mapping):
                         img_buff = img_buff[bytes_remaining:]   # carry over to next iteration
     os.close(fd)
     for image in images:
-        test(image,model,mapping)
+        ret = test(image,model,mapping)
+        print(ret["confidence"])
         # cnn.run_model(image)
         # ps = threading.Thread(target=test, args=(image,model,mapping))
         # ps.start()

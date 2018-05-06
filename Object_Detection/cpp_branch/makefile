@@ -2,7 +2,7 @@ CXX = clang++
 OBJS = OGdetect.o orientation.o classifier.o filtering.o
 DEPS = orientation.h classifier.h filtering.h
 EXE = OGdetect
-CFLAGS = `python3-config --cflags` -O3
+CFLAGS = -std=c++14 `python3-config --cflags` -O3 -Ifrugally_deep/include -IFunctionalPlus-master/include -Inlohmann-json
 LDFLAGS = `python3-config --ldflags`
 
 all: OGdetect

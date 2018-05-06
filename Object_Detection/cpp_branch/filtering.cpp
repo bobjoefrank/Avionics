@@ -60,7 +60,7 @@ std::vector<cv::KeyPoint> GroupKeypoints(std::vector<cv::KeyPoint> keypoints, in
         }
         index_a += 1;
     }
-
+    
     // alternate cluster keypoint without stranded keypoints
     /*std::vector<cv::KeyPoint> keypoints;
     int index_a = 0;

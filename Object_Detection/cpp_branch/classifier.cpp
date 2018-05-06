@@ -37,7 +37,6 @@ cv::Mat ResizeOcrImage(cv::Mat ocr_rotated, int rotated_45){
     //create new image with some space between edge of picture
     cv::Mat ocr_rotated_resized(ocr_rotated.size().height*1.3, ocr_rotated.size().width*1.3, CV_8UC3, cv::Scalar(0, 0, 0));
     //rotating by 45 degrees causes extra border so this will make the border smaller
-    std::cout << ocr_rotated_resized.cols << std::endl;
     if(rotated_45){
         cv::resize(ocr_rotated_resized, ocr_rotated_resized, cv::Size(ocr_rotated_resized.rows/1.15,ocr_rotated_resized.cols/1.15));
     }
@@ -158,38 +157,4 @@ std::string findColor(cv::Mat centers, int index){
         return "red";
     }
     return "COLOR SCALE ERROR";
-}
-
-std::vector<cv::Point> getMaxContour(cv::Mat& img, int oRentation_min_area, int oRentation_max_area)
-{
-    cv::Mat img_grey;
-    cvtColor(img, img_grey, cv::COLOR_BGR2GRAY);
-
-    cv::Mat img_Bnary;
-    cv::threshold(img_grey, img_Bnary, 50, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
-
-    // Find all the contours in the thresholded image
-    std::vector<cv::Vec4i> hierarchy;
-    std::vector<std::vector<cv::Point> > contours;
-    findContours(img_Bnary, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-
-    //find max sized object within specified area limits
-    int max_index = 0;
-    int max_area = 0;
-    for (size_t i = 0; i < contours.size(); ++i)
-    {
-        // Calculate the area of each contour
-        double area = contourArea(contours[i]);
-        // Ignore contours that are too small or too large
-        if (area < oRentation_min_area || oRentation_max_area < area) continue;
-
-        if(area > max_area){
-            max_index = i;
-            max_area = area;
-        }
-    }
-    // Draw contour only for visualisation purposes
-    //drawContours(img, contours[max_index], static_cast<int>(i), Scalar(0, 0, 255), 1, 8, hierarchy, 0);
-
-    return contours[max_index];
 }

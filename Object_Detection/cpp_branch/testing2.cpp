@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
     CvSize size = cvSize(width,height);
     
     // Initialize different images that are going to be used in the program
-    cv::Mat frame_blur;
+    cv::UMat frame_blur;
     IplImage*  hsv_frame    = cvCreateImage(size, IPL_DEPTH_8U, 3); // image converted to HSV plane
     IplImage*  thresholded   = cvCreateImage(size, IPL_DEPTH_8U, 1); // final thresholded image
     IplImage*  thresholded1   = cvCreateImage(size, IPL_DEPTH_8U, 1); // Component image threshold

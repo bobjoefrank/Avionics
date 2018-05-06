@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <map>
 #include "opencv2/core.hpp"
 #include "opencv2/features2d.hpp"
 #include "opencv2/xfeatures2d.hpp"
@@ -16,7 +17,5 @@ cv::Mat ResizeOcrImage(cv::Mat, int);
 cv::Mat RotateOcrImage45(cv::Mat);
 
 std::string findColor(cv::Mat, int);
-
-std::vector<cv::Point> getMaxContour(cv::Mat&, int, int);
 
 #endif

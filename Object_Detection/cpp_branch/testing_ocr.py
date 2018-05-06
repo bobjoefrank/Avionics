@@ -4,7 +4,7 @@ if not hasattr(sys, 'argv'):
     sys.argv  = ['']
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
+import scipy
 from scipy.misc import imsave, imread, imresize
 import numpy as np
 import argparse

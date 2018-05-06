@@ -68,6 +68,7 @@ def test(image,model,mapping):
     #print result
     print(json.dumps(response))
     sys.stdout.flush()
+    return response
 
 if __name__ == '__main__':    #model and weights location
     bin_dir = '/Users/phillip/virtualenv/EMNIST/bin'
