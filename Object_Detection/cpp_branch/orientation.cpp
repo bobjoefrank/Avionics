@@ -1,8 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include "opencv2/highgui.hpp"
-#include "opencv2/imgproc.hpp"
-
+#include <opencv2/imgproc/imgproc_c.h>
 
 void drawAxis(cv::Mat& img, cv::Point p, cv::Point q, cv::Scalar colour, const float scale = 0.2)
 {

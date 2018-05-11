@@ -1,20 +1,17 @@
-#include <unistd.h>
-#include <stdio.h>
 #include <iostream>
 #include <cmath>
 #include <cstdlib>
-#include <Python.h>
 #include <string>
 
-#include "opencv2/core.hpp"
-#include "opencv2/features2d.hpp"
-#include "opencv2/xfeatures2d.hpp"
-#include "opencv2/highgui.hpp"
+#include <opencv2/opencv.hpp>
+#include <opencv2/core/types_c.h>
+#include <opencv2/imgproc/types_c.h>
+
+#include <fdeep/fdeep.hpp>
 
 #include "orientation.h"
 #include "classifier.h"
 #include "filtering.h"
-#include <fdeep/fdeep.hpp>
 
 
 // flood fill cornell
@@ -65,7 +62,7 @@ int main( int argc, char** argv )
     float roi_width = 135;
 
     // padding color
-    cv::Scalar padding_color = cvScalar(255,255,255);
+    cv::Scalar padding_color = cv::Scalar(255,255,255);
 
     // kMeans parameters
     int k = 3;
@@ -149,15 +146,6 @@ int main( int argc, char** argv )
     imshow("Keypoints", img_keypoints );
     imshow("img_hsv_resized_blurred", img_hsv_resized_blurred);
 
-    //initialize python integration
-    wchar_t *program = Py_DecodeLocale(argv[0], NULL);
-    if (program == NULL) {
-        fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
-        exit(1);
-    }
-    Py_SetProgramName(program);  /* optional but recommended */
-    Py_Initialize();
-
     //initialize fdeep model
     const auto model = fdeep::load_model("fdeep_model.json");
 
@@ -230,7 +218,7 @@ int main( int argc, char** argv )
 
         std::vector<std::vector<cv::Point> > canny_contours_ccomp;
         std::vector<cv::Vec4i> canny_hierarchy_ccomp;
-        cv::findContours(roi_canny_edges, canny_contours_ccomp, canny_hierarchy_ccomp, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE, cv::Point(0,0));
+        cv::findContours(roi_canny_edges, canny_contours_ccomp, canny_hierarchy_ccomp, cv::RetrievalModes::RETR_CCOMP, cv::ContourApproximationModes::CHAIN_APPROX_NONE, cv::Point(0,0));
 
         //approximates polygonal curves with polygon of less vertices to smooth (lessen) distance between vertices
         for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
@@ -299,41 +287,20 @@ int main( int argc, char** argv )
                 degrees1 += 90;
                 degrees2 += 90;
             }
-std::map<int, int> mappings = {
-    {0, 48}, {1, 49}, {2, 50}, {3, 51}, {4, 52}, {5, 53}, {6, 54}, {7, 55}, {8, 56}, {9, 57}, {10, 65}, {11, 66}, {12, 67}, {13, 68}, {14, 69}, {15, 70}, {16, 71}, {17, 72}, {18, 73}, {19, 74}, {20, 75}, {21, 76}, {22, 77}, {23, 78}, {24, 79}, {25, 80}, {26, 81}, {27, 82}, {28, 83}, {29, 84}, {30, 85}, {31, 86}, {32, 87}, {33, 88}, {34, 89}, {35, 90}, {36, 97}, {37, 98}, {38, 99}, {39, 100}, {40, 101}, {41, 102}, {42, 103}, {43, 104}, {44, 105}, {45, 106}, {46, 107}, {47, 108}, {48, 109}, {49, 110}, {50, 111}, {51, 112}, {52, 113}, {53, 114}, {54, 115}, {55, 116}, {56, 117}, {57, 118}, {58, 119}, {59, 120}, {60, 121}, {61, 122}
-};
+            std::map<int, int> mappings = {
+                {0, 48}, {1, 49}, {2, 50}, {3, 51}, {4, 52}, {5, 53}, {6, 54}, {7, 55}, 
+                {8, 56}, {9, 57}, {10, 65}, {11, 66}, {12, 67}, {13, 68}, {14, 69}, {15, 70}, 
+                {16, 71}, {17, 72}, {18, 73}, {19, 74}, {20, 75}, {21, 76}, {22, 77}, {23, 78}, 
+                {24, 79}, {25, 80}, {26, 81}, {27, 82}, {28, 83}, {29, 84}, {30, 85}, {31, 86}, 
+                {32, 87}, {33, 88}, {34, 89}, {35, 90}, {36, 97}, {37, 98}, {38, 99}, {39, 100}, 
+                {40, 101}, {41, 102}, {42, 103}, {43, 104}, {44, 105}, {45, 106}, {46, 107}, 
+                {47, 108}, {48, 109}, {49, 110}, {50, 111}, {51, 112}, {52, 113}, {53, 114}, 
+                {54, 115}, {55, 116}, {56, 117}, {57, 118}, {58, 119}, {59, 120}, {60, 121}, {61, 122}
+            };
             const auto input = fdeep::tensor3_from_bytes(test_img.ptr(), test_img.rows, test_img.cols, test_img.channels(), 0.0f, 1.0f);
             const auto result = model.predict({input});
             auto prediction = fdeep::internal::tensor3_max_pos(result.front()).z_;
-            //std::cout << (char)(mappings[prediction]) << std::endl;
-
-            // format input to ocr model and pass in
-            // std::vector<std::vector<float> > ocr_image_vector;
-            // for(int x = 0; x<ocr_resized_45.rows; x++){
-            //     std::vector<float> temp_row;
-            //     for(int y = 0; y<ocr_resized_45.cols; y++){
-            //         temp_row.push_back(((float)ocr_resized_45.at<cv::Vec3b>(x,y).val[0])/255);
-            //     }
-            //     ocr_image_vector.push_back(temp_row);
-            // }
-
-            //save image
-            //imwrite( "../pictures/saved_ocr.jpg", ocr_image_resized );
-
-            //call python ocr model serving program
-            //PyRun_SimpleString("import sys, os\nsys.path.append('.')\nfrom testing_ocr import *\n"
-            //                    "test()");
-
-        //     // format image for input into python server
-        //     // std::vector<unsigned char> storage_buffer;
-        //     // FILE* fp = fopen(argv[2], "w");
-        //     // imencode( ".jpg", ocr_image_resized, storage_buffer);
-        //     // // write(fdnum, &storage_buffer[0], sizeof(uchar));
-        //     // std::string img_size_str = std::to_string(storage_buffer.size());
-        //     // std::cout << img_size_str << std::endl;
-        //     // fwrite(img_size_str.c_str(), sizeof(unsigned char), img_size_str.length()+1, fp); // +1 for \0 byte
-        //     // fwrite(&storage_buffer[0], sizeof(unsigned char), storage_buffer.size(), fp);
-
+            std::cout << (char)(mappings[prediction]) << std::endl;
         }
 
         //
@@ -361,10 +328,6 @@ std::map<int, int> mappings = {
         sprintf(window_name, "kMeans_no.%d", counter);
         imshow( window_name, roi_kmeans );
     }
-
-    //close python applications
-   Py_Finalize();
-   PyMem_RawFree(program);
 
     // wait for 'q' key to close
     char key = cv::waitKey(0);
