@@ -8,20 +8,37 @@
 
 #include "classifier.h"
 
-cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy){
-    //order contours from largest to smallest maybe?
+cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy, int letter_min_area){
 
     //fill in max contour which will be the outermost outline of the letter
     cv::Mat ocr_image = cv::Mat::zeros(img.size(), CV_8UC3);
     cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
+    imshow( "just_the_outermost", ocr_image);
+    char window_name[80];
+    // for (auto vec : hierarchy){
+    //     std::cout << vec << std::endl;
+    // }
 
-    //fill in the other contours which may or may not be the holes of the letter with random colors
+    //fill in the other contours which may or may not be the holes of the letter by alternation
+    double area;
+    bool alternate_color_inversion = true;
+    cv::Scalar color;
     cv::RNG rng(12345);
-    for (size_t  i = 0; i < ocr_contours.size(); ++i){
-        if( (int)i != max_index){
-            cv::Scalar color = cv::Scalar(0,0,0);
+    for (int i = ocr_contours.size()-1; i >= 0; i--){
+        if(i != max_index && i < max_index){
             if(hierarchy[i][3] == -1){
-                cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
+                area = contourArea(ocr_contours[i]);
+                if (area >= letter_min_area){
+                    if (alternate_color_inversion){
+                        color = cv::Scalar(0,0,0);
+                        alternate_color_inversion = false;
+                    } else {
+                        color = cv::Scalar(255,255,255);
+                    }
+                    cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
+                    sprintf(window_name, "step_number:%d", (int)i);
+                    imshow( window_name, ocr_image);
+                }
             }
         }
     }

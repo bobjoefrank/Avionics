@@ -24,27 +24,18 @@
 
 // rotate only the letters and not the shapes
 
-// if the green channel intensity is too low, then remove image
-// possibility of the street and buildings and trees in it which makes shapes
-
-
 // think about if keypoints is less than certain number min:5 just discard the 
 
 // take top number with responses above a certain value or a set number from the top
 // whichever comes first, but more likely those above a certain response
 
-// crop the photo from the test flight and count the pixels to see if it is flying at the correct height
-
-// 474
-// 320 x 480 y
-// 954 x zoom 487 y zoom
-
-// recalculate height and speed of airplane and time between each photo
+// 96 ft x 64 ft at 200 ft altitude
+// 4.8 pixels per inch density
 
 // cornell false positive, if confidence of letter and shape low thne discard image
 // if color of shape and leter are the same, then discard
 
-// rotate dataset and retrain
+// SEPERATE BY KMEANS COLORS AND FIND CONTOURS AND RUN OCR FOR EACH COLOR
 
 
 void readme();
@@ -53,32 +44,32 @@ int main( int argc, char** argv )
 {
 
     //ratio to resize image before putting it in surf detection and then resizing keypoints
-    float surf_resize_factor = 12;
+    float surf_resize_factor = 8;
 
     //number of ROI keypoints to compute with the greatest max_response
-    int roi_count = 12;
+    int roi_count = 20;
 
     // how big cropped roi image will be, total width
-    float roi_width = 135;
+    float roi_width = 230;
 
     // padding color
     cv::Scalar padding_color = cv::Scalar(255,255,255);
 
     // kMeans parameters
     int k = 3;
-    int attempts = 15;
+    int attempts = 10;
 
     // keypoint grouping distance
-    int keypoint_group_distance = 50;
+    int keypoint_group_distance = 400;
 
     // SURF hessian value
-    int minHessian = 800;
+    int minHessian = 500;
 
     // canny edge detection threshold 0-100
     int canny_thresh = 0;
     // ratio for max threshold (suggested 3)
     int canny_ratio = 3;
-    // kernel_sizes 3,5,7,9,11, makes a matrix of that size for canny edge detection
+    // kernel_sizes 3,5,7 makes a matrix of that size for canny edge detection
     int kernel_size = 3;
 
     // scales for visualization purposes only, adjust to lengthen lines
@@ -88,8 +79,8 @@ int main( int argc, char** argv )
     int line_size_2 = 9;
 
     // letter classifier min and max area for contours
-    int letter_min_area = 30;
-    int letter_max_area = 1e4;
+    int letter_min_area = 100;
+    int letter_max_area = 1e9;
 
     // read image
     if( argc < 2 ){
@@ -143,8 +134,8 @@ int main( int argc, char** argv )
     cv::drawKeypoints(img_hsv_resized_blurred, resized_keypoints, img_hsv_resized_blurred, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
 
     // show detected (drawn) keypoints
-    imshow("Keypoints", img_keypoints );
-    imshow("img_hsv_resized_blurred", img_hsv_resized_blurred);
+    //imshow("Keypoints", img_keypoints );
+    //imshow("img_hsv_resized_blurred", img_hsv_resized_blurred);
 
     //initialize fdeep model
     const auto model = fdeep::load_model("fdeep_model.json");
@@ -236,10 +227,14 @@ int main( int argc, char** argv )
         //checks if the largest contour is smaller than acceptable size
         int max_index = 0;
         int max_area = 0;
+        int large_contour_num = 0;
         for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
         {
             // calculate the area of each contour
             double area = contourArea(canny_contours_ccomp[i]);
+            if(counter == 5 || counter == 6){
+                std::cout << area << " counter number: " << (int)i << std::endl;
+            }
             if(area > max_area){
                 max_index = i;
                 max_area = area;
@@ -248,6 +243,7 @@ int main( int argc, char** argv )
             if (area < letter_min_area || area > letter_max_area) continue;
 
             //draw for visuals only if contours big enough
+            large_contour_num++;
             cv::drawContours(roi_kmeans, canny_contours_ccomp, static_cast<int>(i), cvScalar(255, 255, 255), 1, 8, canny_hierarchy_ccomp, 0);
         }
         if( max_area < letter_min_area ){
@@ -259,30 +255,31 @@ int main( int argc, char** argv )
         // classify letters
         //
 
-        std::cout << "number contours: " << canny_contours_ccomp.size() << std::endl;
+        std::cout << "number contours: " << large_contour_num << std::endl;
 
-        if(counter == 1 || counter == 3){
-            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp);
+        if(counter != 500 ){
+            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area);
             cv::Mat ocr_resized = ResizeOcrImage(ocr_cropped, 0);
+            std::cout << "number contours: " << large_contour_num << std::endl;
 
             cv::Mat ocr_rotated_45 = RotateOcrImage45(ocr_cropped);
             cv::Mat ocr_resized_45 = ResizeOcrImage(ocr_rotated_45, 1);
+            
             int degrees1 = 0;
             int degrees2 = 45;
             cv::Mat test_img;
             for(int i = 0; i < 4; ++i){
-                cv::rotate(ocr_resized, ocr_resized, 0);
-                sprintf(window_name, "ocr_resized_no.%d_%d", counter, degrees1);
-                imshow( window_name, ocr_resized);
-
-                cv::rotate(ocr_resized_45, ocr_resized_45, 0);
-                sprintf(window_name, "ocr_resized_no.%d_%d", counter, degrees2);
-                imshow( window_name, ocr_resized_45);
-
-                if (degrees1 == 270){
+                sprintf(window_name, "ocr_no.%d_%d", counter, degrees1);
+                //imshow( window_name, ocr_resized);
+                if (degrees1 == 0){
+                    imshow( window_name, ocr_resized);
                     cv::cvtColor(ocr_resized, test_img, cv::COLOR_BGR2GRAY);
-                    imwrite("testing_image.jpg", test_img);
                 }
+                cv::rotate(ocr_resized, ocr_resized, 0);
+
+                sprintf(window_name, "ocr_no.%d_%d", counter, degrees2);
+                //imshow( window_name, ocr_resized_45);
+                cv::rotate(ocr_resized_45, ocr_resized_45, 0);
 
                 degrees1 += 90;
                 degrees2 += 90;
