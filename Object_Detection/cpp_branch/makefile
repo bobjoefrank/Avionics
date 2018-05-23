@@ -2,8 +2,8 @@ CXX = clang++
 OBJS = OGdetect.o orientation.o classifier.o filtering.o
 DEPS = orientation.h classifier.h filtering.h
 EXE = OGdetect
-CFLAGS = -std=c++14 `python3-config --cflags` -O3 -Iextern -I/usr/local/include
-LDFLAGS = `python3-config --ldflags` $$(pkg-config --libs opencv)
+CFLAGS = -v -std=c++14 -O3 -Iextern
+LDFLAGS = $$(pkg-config --libs opencv)
 
 all: OGdetect
 

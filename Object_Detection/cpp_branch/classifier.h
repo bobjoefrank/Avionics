@@ -10,9 +10,9 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
-cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat, std::vector<cv::Vec4i> hierarchy, int letter_min_area);
+cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> >, int, cv::Mat, std::vector<cv::Vec4i> hierarchy, int letter_min_area, bool white_mask);
 
-cv::Mat ResizeOcrImage(cv::Mat, int);
+cv::Mat ResizeOcrImage(cv::Mat, bool);
 
 cv::Mat RotateOcrImage45(cv::Mat);
 

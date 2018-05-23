@@ -8,10 +8,13 @@
 
 #include "classifier.h"
 
-cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy, int letter_min_area){
+cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy, int letter_min_area, bool white_mask){
 
     //fill in max contour which will be the outermost outline of the letter
     cv::Mat ocr_image = cv::Mat::zeros(img.size(), CV_8UC3);
+    if(white_mask){
+        ocr_image.setTo(cv::Scalar::all(255));
+    }
     cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
     imshow( "just_the_outermost", ocr_image);
     char window_name[80];
@@ -46,31 +49,34 @@ cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_
     //crop out bounded box of letter
     cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
     cv::Mat ocr_cropped = ocr_image(bounding_box);
+    if(white_mask){
+        bitwise_not(ocr_cropped,ocr_cropped);
+    }
 
     return ocr_cropped;
 }
 
-cv::Mat ResizeOcrImage(cv::Mat ocr_rotated, int rotated_45){
+cv::Mat ResizeOcrImage(cv::Mat ocr_image, bool rotated_45){
     //create new image with some space between edge of picture
-    cv::Mat ocr_rotated_resized(ocr_rotated.size().height*1.3, ocr_rotated.size().width*1.3, CV_8UC3, cv::Scalar(0, 0, 0));
+    cv::Mat ocr_resized(ocr_image.size().height*1.3, ocr_image.size().width*1.3, CV_8UC3, cv::Scalar(0, 0, 0));
     //rotating by 45 degrees causes extra border so this will make the border smaller
     if(rotated_45){
-        cv::resize(ocr_rotated_resized, ocr_rotated_resized, cv::Size(ocr_rotated_resized.rows/1.15,ocr_rotated_resized.cols/1.15));
+        cv::resize(ocr_resized, ocr_resized, cv::Size(ocr_resized.rows/1.15,ocr_resized.cols/1.15));
     }
 
     //find center of new created image
-    cv::Point ocr_center(ocr_rotated_resized.cols/2, ocr_rotated_resized.rows/2);
+    cv::Point ocr_center(ocr_resized.cols/2, ocr_resized.rows/2);
 
     //compute the rectangle centered in the image, same size as box
-    cv::Rect center_box(ocr_center.x - ocr_rotated.cols/2, ocr_center.y - ocr_rotated.rows/2, ocr_rotated.cols, ocr_rotated.rows);
+    cv::Rect center_box(ocr_center.x - ocr_image.cols/2, ocr_center.y - ocr_image.rows/2, ocr_image.cols, ocr_image.rows);
 
     //copy the letter into the resized image
-    ocr_rotated.copyTo(ocr_rotated_resized(center_box));
+    ocr_image.copyTo(ocr_resized(center_box));
 
     //resize image to 28x28
-    cv::resize(ocr_rotated_resized, ocr_rotated_resized, cv::Size(28,28));
+    cv::resize(ocr_resized, ocr_resized, cv::Size(28,28));
 
-    return ocr_rotated_resized;
+    return ocr_resized;
 }
 
 cv::Mat RotateOcrImage45(cv::Mat ocr_cropped){

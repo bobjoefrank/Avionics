@@ -72,6 +72,8 @@ int main( int argc, char** argv )
     // kernel_sizes 3,5,7 makes a matrix of that size for canny edge detection
     int kernel_size = 3;
 
+    // i think 5 was best change this back to 5 or 7 when done testing
+
     // scales for visualization purposes only, adjust to lengthen lines
     // scale1 = green line, used as reference for radians
     // scale2 = blue line
@@ -135,7 +137,7 @@ int main( int argc, char** argv )
 
     // show detected (drawn) keypoints
     //imshow("Keypoints", img_keypoints );
-    //imshow("img_hsv_resized_blurred", img_hsv_resized_blurred);
+    imshow("img_hsv_resized_blurred", img_hsv_resized_blurred);
 
     //initialize fdeep model
     const auto model = fdeep::load_model("fdeep_model.json");
@@ -255,24 +257,37 @@ int main( int argc, char** argv )
         // classify letters
         //
 
-        std::cout << "number contours: " << large_contour_num << std::endl;
-
-        if(counter != 500 ){
-            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area);
-            cv::Mat ocr_resized = ResizeOcrImage(ocr_cropped, 0);
+        if(counter == 5 || counter == 6){
             std::cout << "number contours: " << large_contour_num << std::endl;
+            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area,false);
+            cv::Mat ocr_resized = ResizeOcrImage(ocr_cropped, false);
 
             cv::Mat ocr_rotated_45 = RotateOcrImage45(ocr_cropped);
-            cv::Mat ocr_resized_45 = ResizeOcrImage(ocr_rotated_45, 1);
+            cv::Mat ocr_resized_45 = ResizeOcrImage(ocr_rotated_45, true);
             
+            // invert with white mask to find inner letter/object
+            cv::Mat ocr_cropped_invert = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area, true);
+
+            // canny edge to find the new edges of the inverted image
+            
+
+
+
+            cv::Mat ocr_resized_invert = ResizeOcrImage(ocr_cropped_invert, false);
+
+            cv::Mat ocr_rotated_invert_45 = RotateOcrImage45(ocr_cropped_invert);
+            cv::Mat ocr_resized_invert_45 = ResizeOcrImage(ocr_rotated_invert_45, true);
+
+            cv::Mat test_img;
+            cv::Mat white_mask(roi_kmeans.rows, roi_kmeans.cols, roi_kmeans.type(), cv::Scalar::all(255));
+
             int degrees1 = 0;
             int degrees2 = 45;
-            cv::Mat test_img;
             for(int i = 0; i < 4; ++i){
                 sprintf(window_name, "ocr_no.%d_%d", counter, degrees1);
                 //imshow( window_name, ocr_resized);
                 if (degrees1 == 0){
-                    imshow( window_name, ocr_resized);
+                    imshow( window_name, ocr_resized_invert);
                     cv::cvtColor(ocr_resized, test_img, cv::COLOR_BGR2GRAY);
                 }
                 cv::rotate(ocr_resized, ocr_resized, 0);
@@ -297,7 +312,7 @@ int main( int argc, char** argv )
             const auto input = fdeep::tensor3_from_bytes(test_img.ptr(), test_img.rows, test_img.cols, test_img.channels(), 0.0f, 1.0f);
             const auto result = model.predict({input});
             auto prediction = fdeep::internal::tensor3_max_pos(result.front()).z_;
-            std::cout << (char)(mappings[prediction]) << std::endl;
+            std::cout << "Prediction: " << (char)(mappings[prediction]) << std::endl;
         }
 
         //
