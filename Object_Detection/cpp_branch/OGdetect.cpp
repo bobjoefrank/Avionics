@@ -132,7 +132,7 @@ int main( int argc, char** argv )
 
     // draw keypoints
     cv::Mat img_keypoints;
-    cv::drawKeypoints(img, grouped_keypoints, img_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
+    cv::drawKeypoints(img, grouped_keypoints, img_keypoints, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DEFAULT );
     cv::drawKeypoints(img_hsv_resized_blurred, resized_keypoints, img_hsv_resized_blurred, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DEFAULT );
 
     // show detected (drawn) keypoints
@@ -229,7 +229,10 @@ int main( int argc, char** argv )
         //checks if the largest contour is smaller than acceptable size
         int max_index = 0;
         int max_area = 0;
+        int second_max_index = 0;
+        int second_max_area = 0;
         int large_contour_num = 0;
+        int temp_index, temp_area;
         for (size_t i = 0; i < canny_contours_ccomp.size(); ++i)
         {
             // calculate the area of each contour
@@ -237,9 +240,17 @@ int main( int argc, char** argv )
             if(counter == 5 || counter == 6){
                 std::cout << area << " counter number: " << (int)i << std::endl;
             }
-            if(area > max_area){
-                max_index = i;
-                max_area = area;
+            if(area > second_max_area){
+                second_max_index = i;
+                second_max_area = area;
+                if (second_max_area > max_area){
+                    temp_area = max_area;
+                    temp_index = max_index;
+                    max_area = second_max_area;
+                    max_index = second_max_index;
+                    second_max_area = temp_area;
+                    second_max_index = temp_index;
+                }
             }
             //ignore contours too small
             if (area < letter_min_area || area > letter_max_area) continue;
@@ -258,41 +269,42 @@ int main( int argc, char** argv )
         //
 
         if(counter == 5 || counter == 6){
+            // find contours, crop, and reshape for ocr
             std::cout << "number contours: " << large_contour_num << std::endl;
-            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area,false);
+            cv::Mat ocr_cropped = CropOcrImage(canny_contours_ccomp, max_index, second_max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area, true, false);
             cv::Mat ocr_resized = ResizeOcrImage(ocr_cropped, false);
 
             cv::Mat ocr_rotated_45 = RotateOcrImage45(ocr_cropped);
             cv::Mat ocr_resized_45 = ResizeOcrImage(ocr_rotated_45, true);
             
-            // invert with white mask to find inner letter/object
-            cv::Mat ocr_cropped_invert = CropOcrImage(canny_contours_ccomp, max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area, true);
+            // same for shape
+            cv::Mat shape_cropped = CropOcrImage(canny_contours_ccomp, max_index, second_max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area, false, true);
+            cv::Mat shape_resized = ResizeOcrImage(shape_cropped, false);
 
-            // canny edge to find the new edges of the inverted image
-            
+            cv::Mat shape_rotated_45 = RotateOcrImage45(shape_cropped);
+            cv::Mat shape_resized_45 = ResizeOcrImage(shape_rotated_45, true);
 
+            // for both
+            cv::Mat both_cropped = CropOcrImage(canny_contours_ccomp, max_index, second_max_index, roi_kmeans, canny_hierarchy_ccomp, letter_min_area, true, true);
+            cv::Mat both_resized = ResizeOcrImage(both_cropped, false);
 
+            cv::Mat both_rotated_45 = RotateOcrImage45(both_cropped);
+            cv::Mat both_resized_45 = ResizeOcrImage(both_rotated_45, true);
 
-            cv::Mat ocr_resized_invert = ResizeOcrImage(ocr_cropped_invert, false);
-
-            cv::Mat ocr_rotated_invert_45 = RotateOcrImage45(ocr_cropped_invert);
-            cv::Mat ocr_resized_invert_45 = ResizeOcrImage(ocr_rotated_invert_45, true);
-
+            //rotate images 45 degrees and try ocr and shape, take highest confidence response
             cv::Mat test_img;
-            cv::Mat white_mask(roi_kmeans.rows, roi_kmeans.cols, roi_kmeans.type(), cv::Scalar::all(255));
-
             int degrees1 = 0;
             int degrees2 = 45;
             for(int i = 0; i < 4; ++i){
-                sprintf(window_name, "ocr_no.%d_%d", counter, degrees1);
+                sprintf(window_name, "ocr_no.%d_%ddegrees", counter, degrees1);
                 //imshow( window_name, ocr_resized);
                 if (degrees1 == 0){
-                    imshow( window_name, ocr_resized_invert);
+                    imshow( window_name, ocr_resized);
                     cv::cvtColor(ocr_resized, test_img, cv::COLOR_BGR2GRAY);
                 }
                 cv::rotate(ocr_resized, ocr_resized, 0);
 
-                sprintf(window_name, "ocr_no.%d_%d", counter, degrees2);
+                sprintf(window_name, "ocr_no.%d_%ddegrees", counter, degrees2);
                 //imshow( window_name, ocr_resized_45);
                 cv::rotate(ocr_resized_45, ocr_resized_45, 0);
 
@@ -341,11 +353,11 @@ int main( int argc, char** argv )
         imshow( window_name, roi_kmeans );
     }
 
-    // wait for 'q' key to close
-    char key = cv::waitKey(0);
-    while ( key != 'q'){
-        key = cv::waitKey(0);
-    }
+     //wait for 'q' key to close
+     char key = cv::waitKey(0);
+     while ( key != 'q'){
+         key = cv::waitKey(0);
+     }
 }
 
 /* @function readme */

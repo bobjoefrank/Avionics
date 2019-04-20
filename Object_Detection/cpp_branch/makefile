@@ -2,8 +2,8 @@ CXX = clang++
 OBJS = OGdetect.o orientation.o classifier.o filtering.o
 DEPS = orientation.h classifier.h filtering.h
 EXE = OGdetect
-CFLAGS = -v -std=c++14 -O3 -Iextern
-LDFLAGS = $$(pkg-config --libs opencv)
+CFLAGS = -std=c++14 -O3 -Iextern
+LDFLAGS = $$(pkg-config --libs opencv) -lprofiler -ltcmalloc
 
 all: OGdetect
 

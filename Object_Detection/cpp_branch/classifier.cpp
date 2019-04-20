@@ -8,15 +8,21 @@
 
 #include "classifier.h"
 
-cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy, int letter_min_area, bool white_mask){
+cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_index,
+    int second_max_index, cv::Mat img, std::vector<cv::Vec4i> hierarchy,
+    int letter_min_area, bool ocr_bool, bool shape_bool){
 
     //fill in max contour which will be the outermost outline of the letter
-    cv::Mat ocr_image = cv::Mat::zeros(img.size(), CV_8UC3);
-    if(white_mask){
-        ocr_image.setTo(cv::Scalar::all(255));
+    cv::Mat mask_img = cv::Mat::zeros(img.size(), CV_8UC3);
+    // if(ocr_bool){
+    //     mask_img.setTo(cv::Scalar::all(255));
+    // }
+    //cv::Mat white_mask(img.rows, img.cols, img.type(), cv::Scalar::all(255));
+    if(!ocr_bool && shape_bool){
+        cv::fillConvexPoly( mask_img, ocr_contours[max_index], cv::Scalar(255, 255, 255));
+        imshow( "just_the_outermost", mask_img);
+        return mask_img;
     }
-    cv::fillConvexPoly( ocr_image, ocr_contours[max_index], cv::Scalar(255, 255, 255));
-    imshow( "just_the_outermost", ocr_image);
     char window_name[80];
     // for (auto vec : hierarchy){
     //     std::cout << vec << std::endl;
@@ -26,34 +32,58 @@ cv::Mat CropOcrImage(std::vector<std::vector<cv::Point> > ocr_contours, int max_
     double area;
     bool alternate_color_inversion = true;
     cv::Scalar color;
-    cv::RNG rng(12345);
-    for (int i = ocr_contours.size()-1; i >= 0; i--){
-        if(i != max_index && i < max_index){
-            if(hierarchy[i][3] == -1){
-                area = contourArea(ocr_contours[i]);
-                if (area >= letter_min_area){
-                    if (alternate_color_inversion){
-                        color = cv::Scalar(0,0,0);
-                        alternate_color_inversion = false;
-                    } else {
-                        color = cv::Scalar(255,255,255);
+
+    //for letter
+    if(ocr_bool){
+        for (int i = ocr_contours.size()-1; i >= 0; i--){
+            if(i != max_index && i < max_index){
+                if(hierarchy[i][3] == -1){
+                    area = contourArea(ocr_contours[i]);
+                    if (area >= letter_min_area){
+                        if (alternate_color_inversion){
+                            color = cv::Scalar(0,0,0);
+                            alternate_color_inversion = false;
+                        } else {
+                            color = cv::Scalar(255,255,255);
+                        }
+                        cv::fillConvexPoly( mask_img, ocr_contours[i], color);
                     }
-                    cv::fillConvexPoly( ocr_image, ocr_contours[i], color);
-                    sprintf(window_name, "step_number:%d", (int)i);
-                    imshow( window_name, ocr_image);
                 }
             }
         }
     }
 
-    //crop out bounded box of letter
-    cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
-    cv::Mat ocr_cropped = ocr_image(bounding_box);
-    if(white_mask){
-        bitwise_not(ocr_cropped,ocr_cropped);
+    //for shape
+    area = 0;
+    alternate_color_inversion = true;
+    if(shape_bool){
+        for (int i = ocr_contours.size()-1; i >= 0; i--){
+            if(i != max_index && i < max_index){
+                if(hierarchy[i][3] == -1){
+                    area = contourArea(ocr_contours[i]);
+                    if (area >= letter_min_area){
+                        if (alternate_color_inversion){
+                            color = cv::Scalar(0,0,0);
+                            alternate_color_inversion = false;
+                        } else {
+                            color = cv::Scalar(255,255,255);
+                        }
+                        cv::fillConvexPoly( mask_img, ocr_contours[i], color);
+                    }
+                }
+            }
+        }
+
     }
 
-    return ocr_cropped;
+    //crop out bounded box of letter
+    cv::Rect bounding_box = boundingRect(ocr_contours[max_index]);
+    cv::Mat mask_img_cropped = mask_img(bounding_box);
+    if(ocr_bool){
+        bitwise_not(mask_img_cropped, mask_img_cropped);
+    }
+
+    return mask_img_cropped;
 }
 
 cv::Mat ResizeOcrImage(cv::Mat ocr_image, bool rotated_45){
